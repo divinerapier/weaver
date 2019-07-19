@@ -1,5 +1,5 @@
 [package]
-name = "onyxia-volume"
+name = "onyxia-cache"
 version = "0.1.0"
 authors = ["divinerapier <poriter.coco@gmail.com>"]
 edition = "2018"
