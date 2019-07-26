@@ -1,25 +1,27 @@
 # OnyxiaFS
 
-A distributed object file system inspired by the paper [Beaver](https://www.usenix.org/legacy/event/osdi10/tech/full_papers/Beaver.pdf) which was published by Facebook Inc. at 2010.
+`OnyxiaFS` 是一个基于 `Facebook Inc.` 在 `2010` 发表的[论文](https://www.usenix.org/legacy/event/osdi10/tech/full_papers/Beaver.pdf) 开发的一个分布式对象文件系统。
 
-## Structure
+## 组件
+
+### OnyxiaGateway
+
+作为所有请求的入口。
 
 ### OnyxiaDirectory
 
-#### Fore Main Functions
-
-1. Provides a mapping from logical volumes to physical volumes. Web servers use this mapping when uploading photos and also when construcing the image URLs for a page request.
-2. Load balances writes across logical volumes and reads across physical volumes.
-3. Determines whether a photo request should be handled by the CDN or by the Cache. This functionality lets us adjust our dependence on CDNs.
-4. Identifies thoes logical volumes that are read-only either because of operational reasons or because those volumes have reached thir storage capacity.
+1. 维护逻辑卷到物理卷的映射关系；
+2. 负责对读写数据进行负载均衡；
+1. 维护逻辑卷的空闲空间；
+1. 维护图片对应的逻辑卷；
 
 ### OnyxiaCache
 
-The Cache who receives HTTP requests for photos from CDNs and also directly from users' browser is a distributed hash table and use a photo's id as the key to locate cached data. If the Cache cannot immediately respond to the request, then the Cache fetches the photo from the Store machine identified in the URL and replies to either the CDN or the user's browser as appropriate.
+`Cache` 服务是一个分布式缓存，可以使用数据的 `ID` 对内容进行索引。当缓存命中失败时，负责从后端 `Store` 服务获取数据。
 
 ### OnyxiaStore
 
-Each Store machine managese multiple physical volumes. Each volume holds millions of photos. For concreteness, the reader can think of a physical volume as simply a very large file (100 GB) saved as '/onyxia/\<logical volume id\>'. A Store machine can access a photo quickly using only the id of the corresponding logical volume and the file offset at which the photo resides. This knowledge is the keystone of the design: retrieving the filename, offset and size for a particular photo without needing disk operations.
+每一个 `Store` 服务维护多个物理卷。每个物理卷存储了百万级别的数据。具体来说，一个物理卷可以被认为是一个超大的文件(比如100G)，被保存在物理磁盘上的某个位置。可以通过图片所在物理卷及偏移量，大小等信息快速读取数据。
 
 ## Architecture
 
