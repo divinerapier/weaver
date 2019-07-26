@@ -1,2 +1,8 @@
-/target
+# rust
+target/
 **/*.rs.bk
+*.lock
+
+# ide
+.idea
+.vscode
