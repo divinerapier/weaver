@@ -1039,6 +1039,7 @@ name = "onyxia-gateway"
 version = "0.1.0"
 dependencies = [
  "actix 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "actix-http 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-multipart 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-web 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
