@@ -107,8 +107,8 @@ fn main() -> std::io::Result<()> {
             .data(Cell::new(0usize))
             .wrap(middleware::Logger::default())
             .service(
-                // FIXME: can not represent the path who has a slash
-                web::resource("/{path}")
+                // https://actix.rs/docs/url-dispatch/
+                web::resource("/{path:.*}")
                     .route(web::get().to(index))
                     .route(web::post().to_async(upload)),
             )
