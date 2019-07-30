@@ -1,5 +1,3 @@
-use actix_http::httpmessage::HttpMessage;
-use actix_web::FromRequest;
 use std::cell::Cell;
 use std::fs;
 use std::io::Write;
@@ -8,6 +6,8 @@ use actix_multipart::{Field, Multipart, MultipartError};
 use actix_web::{error, middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use futures::future::{err, Either};
 use futures::{Future, Stream};
+
+mod file;
 
 pub struct AppState {
     pub counter: Cell<usize>,
@@ -75,6 +75,21 @@ pub fn upload(
         })
 }
 
+pub fn download(req: HttpRequest) -> HttpResponse {
+    let path = req.match_info().get("path").unwrap().to_owned();
+
+    match std::fs::File::open(path) {
+        Err(e) => match e.kind() {
+            std::io::ErrorKind::NotFound => HttpResponse::NotFound().body("file not found"),
+            err @ _ => {
+                let message = format!("{:?}", err);
+                HttpResponse::InternalServerError().body(message)
+            }
+        },
+        Ok(f) => HttpResponse::Ok().streaming(file::FileStream::from_std_file(f)),
+    }
+}
+
 fn index() -> HttpResponse {
     let html = r#"<html>
         <head><title>Upload Test</title>
@@ -82,7 +97,7 @@ fn index() -> HttpResponse {
                 function upload(input) {
                     var filename = document.getElementById('FileName').value;
                     console.log('filename = ' + filename);
-                    document.getElementById('UploadForm').action = filename
+                    document.getElementById('UploadForm').action = 'api/' + filename
                 }
             </script>
         </head>
@@ -108,12 +123,12 @@ fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .service(
                 // https://actix.rs/docs/url-dispatch/
-                web::resource("/{path:.*}")
-                    .route(web::get().to(index))
+                web::resource("/api/{path:.*}")
+                    .route(web::get().to(download))
                     .route(web::post().to_async(upload)),
             )
-            .service(web::resource("/").route(web::get().to(index)))
+            .service(web::resource("/index").route(web::get().to(index)))
     })
-    .bind("127.0.0.1:8080")?
+    .bind("127.0.0.1:18080")?
     .run()
 }
