@@ -8,7 +8,6 @@ use futures::future::{err, Either};
 use futures::{Future, Stream};
 
 mod file;
-mod storage;
 
 pub struct AppState {
     pub counter: Cell<usize>,

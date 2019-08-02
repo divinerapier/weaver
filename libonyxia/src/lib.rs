@@ -1,3 +1,8 @@
+pub mod directory;
+pub mod index;
+pub mod needle;
+pub mod volume;
+
 #[cfg(test)]
 mod tests {
     #[test]
