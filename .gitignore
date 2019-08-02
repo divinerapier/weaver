@@ -5,3 +5,7 @@ target/
 # ide
 .idea
 .vscode
+
+# test data
+*.txt
+data/
