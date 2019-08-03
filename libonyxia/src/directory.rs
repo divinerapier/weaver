@@ -1,6 +1,8 @@
 use crate::needle::Needle;
 use crate::volume::Volume;
 
+use crate::error::{Error, Result};
+
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -18,7 +20,7 @@ pub struct Directory {
 impl Directory {
     /// new opens the storage by specified path
     /// and also loads the indexes
-    pub fn new<P>(path: P) -> std::io::Result<Directory>
+    pub fn new<P>(path: P) -> Result<Directory>
     where
         P: AsRef<Path>,
     {
@@ -27,7 +29,7 @@ impl Directory {
         for entry in dir {
             let entry = entry?;
             let inner_file_path: std::path::PathBuf = entry.path();
-            Volume::open(inner_file_path.as_path()).map(|volume| {
+            Volume::open(inner_file_path.as_path()).map(|volume| -> Result<()> {
                 let volume: Volume = volume;
                 let index = result.volumes.len();
                 let writable = volume.writable();
@@ -38,10 +40,15 @@ impl Directory {
                     result.readonly_volumes.insert(index);
                 }
                 // TODO: optimize copying index
-                let volume_ref: &Volume = result.volumes.get(index).unwrap();
+                let volume_ref: Result<&Volume> = result
+                    .volumes
+                    .get(index)
+                    .ok_or(Error::not_found(format!("volume: {}", index)));
+                let volume_ref = volume_ref?;
                 for (k, v) in &volume_ref.indexes {
                     result.needle_map.insert(k.to_owned(), index);
                 }
+                Ok(())
             });
         }
         Ok(result)
