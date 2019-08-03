@@ -1,5 +1,6 @@
 use crate::needle::Needle;
-use crate::volume::{Volume, VolumeExtension};
+use crate::volume::Volume;
+
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -21,17 +22,29 @@ impl Directory {
     where
         P: AsRef<Path>,
     {
+        let mut result = Directory::default();
         let dir: std::fs::ReadDir = std::fs::read_dir(path)?;
         for entry in dir {
             let entry = entry?;
             let inner_file_path: std::path::PathBuf = entry.path();
-            if let Some(extension) = inner_file_path.extension() {
-                if let VolumeExtension::Index = VolumeExtension::from(extension) {
-                    // TODO: load indexes and open related physical volume
+            Volume::open(inner_file_path.as_path()).map(|volume| {
+                let volume: Volume = volume;
+                let index = result.volumes.len();
+                let writable = volume.writable();
+                result.volumes.push(volume);
+                if writable {
+                    result.writable_volumes.insert(index);
+                } else {
+                    result.readonly_volumes.insert(index);
                 }
-            }
+                // TODO: optimize copying index
+                let volume_ref: &Volume = result.volumes.get(index).unwrap();
+                for (k, v) in &volume_ref.indexes {
+                    result.needle_map.insert(k.to_owned(), index);
+                }
+            });
         }
-        unimplemented!()
+        Ok(result)
     }
 
     /// upload appends the body to any avaiable volume and
@@ -54,7 +67,13 @@ impl Directory {
     }
 }
 
-mod test {
-    #[test]
-    fn foo() {}
+impl Default for Directory {
+    fn default() -> Directory {
+        Directory {
+            volumes: vec![],
+            writable_volumes: HashSet::new(),
+            readonly_volumes: HashSet::new(),
+            needle_map: HashMap::new(),
+        }
+    }
 }
