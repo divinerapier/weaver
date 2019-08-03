@@ -1,3 +1,4 @@
+use crate::error::{Error, Result};
 use crate::index::{Index, RawIndex};
 use crate::needle::Needle;
 use crate::utils;
@@ -51,14 +52,18 @@ pub struct Volume {
 }
 
 impl Volume {
-    pub fn new(dir: &Path, index: usize) -> Option<Volume> {
+    pub fn new(dir: &Path, index: usize) -> Result<Volume> {
         let volume_path: PathBuf = dir.join(format!("{}.data", index));
         let index_path: PathBuf = dir.join(format!("{}.index", index));
-        let (index_file, index_map) = Self::open_indexes(index_path, true).unwrap();
-        let (readonly_file, writable_file) = Self::open_volumes(&volume_path, false).unwrap();
-        let current_length = writable_file.metadata().unwrap().len();
-        Some(Volume {
-            volume_path: volume_path.to_str().unwrap().to_owned(),
+        // TODO: check file if exists
+        let (index_file, index_map) = Self::open_indexes(index_path, true)?;
+        let (readonly_file, writable_file) = Self::open_volumes(&volume_path, false)?;
+        let current_length = writable_file.metadata()?.len();
+        Ok(Volume {
+            volume_path: volume_path
+                .to_str()
+                .ok_or(format!("{:?} to string", volume_path))?
+                .to_owned(),
             writable_volume: writable_file,
             readonly_volume: readonly_file,
             current_length,
@@ -70,24 +75,30 @@ impl Volume {
 
     /// open a physical volume file from disk
     /// volume_path is the
-    pub fn open(volume_path: &Path) -> Option<Volume> {
-        let extension = volume_path.extension()?;
+    pub fn open(volume_path: &Path) -> Result<Volume> {
+        let extension = volume_path.extension().ok_or(Error::file_system(
+            format! {"get file_stem from {:?}", volume_path},
+        ))?;
         if extension != "index" {
-            return None;
+            return Err(Box::new(Error::OpenVolume));
         }
         // filename should be a usize number
-        let _filename = volume_path.file_stem()?.to_str()?.parse::<usize>().unwrap();
-        let volume_path_str = volume_path.to_str()?;
-        let extension_str = extension.to_str()?;
+        let volume_path_str = volume_path
+            .to_str()
+            .ok_or(Error::parse(format! {"{:?} to string", volume_path}))?;
+        let _filename = Self::parse_volume_file_stem_name(volume_path)?;
+        let extension_str = extension
+            .to_str()
+            .ok_or(Error::parse(format! {"{:?} to string", volume_path}))?;
         let naive_volume_path_str = utils::strings::trim_suffix(volume_path_str, extension_str)?;
         let index_file_str = naive_volume_path_str.to_owned() + "index";
         let volume_file_str = naive_volume_path_str.to_owned() + "data";
 
-        let (index_file, index_map) = Self::open_indexes(index_file_str, false).unwrap();
-        let (readonly_file, writable_file) = Self::open_volumes(volume_file_str, false).unwrap();
-        let current_length = writable_file.metadata().unwrap().len();
-        Some(Volume {
-            volume_path: volume_path.to_str().unwrap().to_owned(),
+        let (index_file, index_map) = Self::open_indexes(index_file_str, false)?;
+        let (readonly_file, writable_file) = Self::open_volumes(volume_file_str, false)?;
+        let current_length = writable_file.metadata()?.len();
+        Ok(Volume {
+            volume_path: volume_path.to_str().ok_or(Error::naive(format!("{:?} to string", volume_path)))?.to_owned(),
             writable_volume: writable_file,
             readonly_volume: readonly_file,
             current_length,
@@ -95,6 +106,18 @@ impl Volume {
             index_file,
             indexes: index_map,
         })
+    }
+
+    fn parse_volume_file_stem_name(volume_path: &Path) -> Result<usize> {
+        let stem = volume_path.file_stem().ok_or(Error::file_system(format!(
+            "get file_stem from {:?}",
+            volume_path
+        )))?;
+        let stem = stem
+            .to_str()
+            .ok_or(Error::parse(format!("{:?} to string", stem)))?;
+        let stem = stem.parse::<usize>()?;
+        Ok(stem)
     }
 
     pub fn writable(&self) -> bool {
@@ -105,10 +128,7 @@ impl Volume {
         !self.writable()
     }
 
-    fn open_volumes<P: AsRef<Path>>(
-        volume_filepath: P,
-        new: bool,
-    ) -> std::io::Result<(File, File)> {
+    fn open_volumes<P: AsRef<Path>>(volume_filepath: P, new: bool) -> Result<(File, File)> {
         let writable_file: File = OpenOptions::new()
             .read(true)
             .write(true)
@@ -132,7 +152,7 @@ impl Volume {
     fn open_indexes<P: AsRef<Path>>(
         filepath: P,
         new: bool,
-    ) -> std::io::Result<(File, HashMap<String, RawIndex>)> {
+    ) -> Result<(File, HashMap<String, RawIndex>)> {
         let index_file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -159,24 +179,24 @@ impl Volume {
         Ok((index_file, index_map))
     }
 
-    pub fn get<K>(&mut self, key: K) -> Option<Needle>
+    pub fn get<K>(&mut self, key: K) -> Result<Needle>
     where
         K: Into<String>,
     {
         let key = key.into();
-        let index: &RawIndex = self.indexes.get(&key)?;
+        let index: &RawIndex = self
+            .indexes
+            .get(&key)
+            .ok_or(Error::not_found(format!("not in indexes: {}", key)))?;
         if ((index.offset + index.length) as u64) < self.current_length {
-            // FIXME: should return an error
-            return None;
+            return Err(Error::data_corruption(key, "index out of current length"));
         }
-        // TODO: error should be handled instead of calling unwrap
         self.readonly_volume
-            .seek(std::io::SeekFrom::Start(index.offset as u64))
-            .unwrap();
+            .seek(std::io::SeekFrom::Start(index.offset as u64))?;
         let mut buffer = Vec::with_capacity(index.length);
         buffer.resize(index.length, 0 as u8);
-        self.readonly_volume.read_exact(&mut buffer).unwrap();
-        Some(Needle {
+        self.readonly_volume.read_exact(&mut buffer)?;
+        Ok(Needle {
             body: bytes::Bytes::from(buffer),
             length: index.length,
         })
