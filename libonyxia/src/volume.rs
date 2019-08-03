@@ -1,4 +1,4 @@
-use crate::index::Index;
+use crate::index::{Index, RawIndex};
 use crate::needle::Needle;
 use crate::utils;
 
@@ -7,6 +7,8 @@ use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
+
+use serde_json::Deserializer;
 
 pub enum VolumeExtension {
     Index = 1,
@@ -45,15 +47,14 @@ pub struct Volume {
     pub current_length: u64,
     pub max_length: u64,
     pub index_file: File,
-    pub indexes: HashMap<String, Index>,
+    pub indexes: HashMap<String, RawIndex>,
 }
 
 impl Volume {
     pub fn new(dir: &Path, index: usize) -> Option<Volume> {
-        // filename should be a usize number
         let volume_path: PathBuf = dir.join(format!("{}.data", index));
         let index_path: PathBuf = dir.join(format!("{}.index", index));
-        let index_file = Self::open_indexes(index_path, true).unwrap();
+        let (index_file, index_map) = Self::open_indexes(index_path, true).unwrap();
         let (readonly_file, writable_file) = Self::open_volumes(&volume_path, false).unwrap();
         let current_length = writable_file.metadata().unwrap().len();
         Some(Volume {
@@ -63,7 +64,7 @@ impl Volume {
             current_length,
             max_length: MAX_VOLUME_SIZE,
             index_file,
-            indexes: HashMap::new(),
+            indexes: index_map,
         })
     }
 
@@ -82,7 +83,7 @@ impl Volume {
         let index_file_str = naive_volume_path_str.to_owned() + "index";
         let volume_file_str = naive_volume_path_str.to_owned() + "data";
 
-        let index_file = Self::open_indexes(index_file_str, false).unwrap();
+        let (index_file, index_map) = Self::open_indexes(index_file_str, false).unwrap();
         let (readonly_file, writable_file) = Self::open_volumes(volume_file_str, false).unwrap();
         let current_length = writable_file.metadata().unwrap().len();
         Some(Volume {
@@ -92,7 +93,7 @@ impl Volume {
             current_length,
             max_length: MAX_VOLUME_SIZE,
             index_file,
-            indexes: HashMap::new(),
+            indexes: index_map,
         })
     }
 
@@ -128,16 +129,34 @@ impl Volume {
         Ok((readonly_file, writable_file))
     }
 
-    fn open_indexes<P: AsRef<Path>>(filepath: P, new: bool) -> std::io::Result<File> {
-        // TODO: extract index content
-        OpenOptions::new()
+    fn open_indexes<P: AsRef<Path>>(
+        filepath: P,
+        new: bool,
+    ) -> std::io::Result<(File, HashMap<String, RawIndex>)> {
+        let index_file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(new)
-            .create_new(false)
+            .create_new(new)
             .truncate(false)
             .append(true)
-            .open(filepath)
+            .open(filepath)?;
+
+        let mut index_map = HashMap::new();
+
+        if new {
+            return Ok((index_file, index_map));
+        }
+
+        let reader = std::io::BufReader::new(index_file.try_clone()?);
+        let indexes_reader = Deserializer::from_reader(reader).into_iter::<Index>();
+        for index_result in indexes_reader {
+            let index: Index = index_result?;
+            let raw_index = RawIndex::new(index.offset, index.length);
+            index_map.insert(index.path, raw_index);
+        }
+
+        Ok((index_file, index_map))
     }
 
     pub fn get<K>(&mut self, key: K) -> Option<Needle>
@@ -145,7 +164,7 @@ impl Volume {
         K: Into<String>,
     {
         let key = key.into();
-        let index: &Index = self.indexes.get(&key)?;
+        let index: &RawIndex = self.indexes.get(&key)?;
         if ((index.offset + index.length) as u64) < self.current_length {
             // FIXME: should return an error
             return None;
@@ -162,4 +181,44 @@ impl Volume {
             length: index.length,
         })
     }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn read_json_from_file() {
+        use super::Index;
+        use serde_json::Deserializer;
+        use std::fs::File;
+        use std::io::Seek;
+        use std::io::Write;
+
+        let mut file: File = tempfile::tempfile().unwrap();
+
+        let indexes: Vec<Index> = vec![
+            Index::new("/tmp/file1".to_owned(), 0, 10),
+            Index::new("/tmp/file2".to_owned(), 10, 20),
+            Index::new("/tmp/file3".to_owned(), 20, 30),
+        ];
+
+        for index in &indexes {
+            let value = serde_json::to_string(index).unwrap();
+            file.write(value.as_bytes()).unwrap();
+            file.sync_all().unwrap();
+        }
+        file.seek(std::io::SeekFrom::Start(0)).unwrap();
+        let reader = std::io::BufReader::new(file.try_clone().unwrap());
+        let mut result = vec![];
+        let indexes_reader = Deserializer::from_reader(reader).into_iter::<Index>();
+        for index_result in indexes_reader {
+            let index: Index = index_result.unwrap();
+            result.push(index);
+        }
+        assert_eq!(indexes.len(), result.len());
+        assert_eq!(indexes[0], result[0]);
+        for (i, _) in indexes.iter().enumerate() {
+            assert_eq!(result[i], indexes[i]);
+        }
+    }
+
 }
