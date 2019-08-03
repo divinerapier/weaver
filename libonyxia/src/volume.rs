@@ -1,16 +1,20 @@
 use crate::index::Index;
 use crate::needle::Needle;
+use crate::utils;
 
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek};
+use std::path::{Path, PathBuf};
 
 pub enum VolumeExtension {
     Index = 1,
     Data = 2,
     Unknown = 99,
 }
+
+const MAX_VOLUME_SIZE: u64 = 1 * (2 << 30);
 
 impl From<&str> for VolumeExtension {
     fn from(t: &str) -> VolumeExtension {
@@ -35,31 +39,124 @@ impl From<&OsStr> for VolumeExtension {
 
 #[allow(dead_code)]
 pub struct Volume {
-    volume_path: String,
-    physical_volume: File,
-    current_length: usize,
-    max_length: usize,
-    indexes: HashMap<String, Index>,
+    pub volume_path: String,
+    pub writable_volume: File,
+    pub readonly_volume: File,
+    pub current_length: u64,
+    pub max_length: u64,
+    pub index_file: File,
+    pub indexes: HashMap<String, Index>,
 }
 
 impl Volume {
+    pub fn new(dir: &Path, index: usize) -> Option<Volume> {
+        // filename should be a usize number
+        let volume_path: PathBuf = dir.join(format!("{}.data", index));
+        let index_path: PathBuf = dir.join(format!("{}.index", index));
+        let index_file = Self::open_indexes(index_path, true).unwrap();
+        let (readonly_file, writable_file) = Self::open_volumes(&volume_path, false).unwrap();
+        let current_length = writable_file.metadata().unwrap().len();
+        Some(Volume {
+            volume_path: volume_path.to_str().unwrap().to_owned(),
+            writable_volume: writable_file,
+            readonly_volume: readonly_file,
+            current_length,
+            max_length: MAX_VOLUME_SIZE,
+            index_file,
+            indexes: HashMap::new(),
+        })
+    }
+
+    /// open a physical volume file from disk
+    /// volume_path is the
+    pub fn open(volume_path: &Path) -> Option<Volume> {
+        let extension = volume_path.extension()?;
+        if extension != "index" {
+            return None;
+        }
+        // filename should be a usize number
+        let _filename = volume_path.file_stem()?.to_str()?.parse::<usize>().unwrap();
+        let volume_path_str = volume_path.to_str()?;
+        let extension_str = extension.to_str()?;
+        let naive_volume_path_str = utils::strings::trim_suffix(volume_path_str, extension_str)?;
+        let index_file_str = naive_volume_path_str.to_owned() + "index";
+        let volume_file_str = naive_volume_path_str.to_owned() + "data";
+
+        let index_file = Self::open_indexes(index_file_str, false).unwrap();
+        let (readonly_file, writable_file) = Self::open_volumes(volume_file_str, false).unwrap();
+        let current_length = writable_file.metadata().unwrap().len();
+        Some(Volume {
+            volume_path: volume_path.to_str().unwrap().to_owned(),
+            writable_volume: writable_file,
+            readonly_volume: readonly_file,
+            current_length,
+            max_length: MAX_VOLUME_SIZE,
+            index_file,
+            indexes: HashMap::new(),
+        })
+    }
+
+    pub fn writable(&self) -> bool {
+        self.current_length < self.max_length
+    }
+
+    pub fn readonly(&self) -> bool {
+        !self.writable()
+    }
+
+    fn open_volumes<P: AsRef<Path>>(
+        volume_filepath: P,
+        new: bool,
+    ) -> std::io::Result<(File, File)> {
+        let writable_file: File = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .append(true)
+            .create(new)
+            .create_new(new)
+            .truncate(false)
+            .open(volume_filepath.as_ref())?;
+        let readonly_file: File = OpenOptions::new()
+            .read(true)
+            .write(false)
+            .append(false)
+            .create(new)
+            .create_new(new)
+            .truncate(false)
+            .open(volume_filepath)?;
+
+        Ok((readonly_file, writable_file))
+    }
+
+    fn open_indexes<P: AsRef<Path>>(filepath: P, new: bool) -> std::io::Result<File> {
+        // TODO: extract index content
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(new)
+            .create_new(false)
+            .truncate(false)
+            .append(true)
+            .open(filepath)
+    }
+
     pub fn get<K>(&mut self, key: K) -> Option<Needle>
     where
         K: Into<String>,
     {
         let key = key.into();
         let index: &Index = self.indexes.get(&key)?;
-        if index.offset + index.length < self.current_length {
+        if ((index.offset + index.length) as u64) < self.current_length {
             // FIXME: should return an error
             return None;
         }
         // TODO: error should be handled instead of calling unwrap
-        self.physical_volume
+        self.readonly_volume
             .seek(std::io::SeekFrom::Start(index.offset as u64))
             .unwrap();
         let mut buffer = Vec::with_capacity(index.length);
         buffer.resize(index.length, 0 as u8);
-        self.physical_volume.read_exact(&mut buffer).unwrap();
+        self.readonly_volume.read_exact(&mut buffer).unwrap();
         Some(Needle {
             body: bytes::Bytes::from(buffer),
             length: index.length,
