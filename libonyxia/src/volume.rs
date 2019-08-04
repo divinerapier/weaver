@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{self, Error, Result};
 use crate::index::{Index, RawIndex};
 use crate::needle::Needle;
 use crate::utils;
@@ -55,7 +55,18 @@ impl Volume {
     pub fn new(dir: &Path, index: usize) -> Result<Volume> {
         let volume_path: PathBuf = dir.join(format!("{}.data", index));
         let index_path: PathBuf = dir.join(format!("{}.index", index));
-        // TODO: check file if exists
+        if volume_path.exists() {
+            return Err(Error::volume(error::VolumeError::create(
+                index,
+                "already exists",
+            )));
+        }
+        if index_path.exists() {
+            return Err(Error::index(error::IndexError::create(
+                index,
+                "already exists",
+            )));
+        }
         let (index_file, index_map) = Self::open_indexes(index_path, true)?;
         let (readonly_file, writable_file) = Self::open_volumes(&volume_path, false)?;
         let current_length = writable_file.metadata()?.len();
@@ -76,20 +87,24 @@ impl Volume {
     /// open a physical volume file from disk
     /// volume_path is the
     pub fn open(volume_path: &Path) -> Result<Volume> {
-        let extension = volume_path.extension().ok_or(Error::file_system(
+        let extension = volume_path.extension().ok_or(Error::path(
             format! {"get file_stem from {:?}", volume_path},
         ))?;
         if extension != "index" {
             return Err(Box::new(Error::OpenVolume));
         }
         // filename should be a usize number
-        let volume_path_str = volume_path
-            .to_str()
-            .ok_or(Error::parse(format! {"{:?} to string", volume_path}))?;
+        let volume_path_str = volume_path.to_str().ok_or(Error::parse(
+            "std::path::Path",
+            "&str",
+            format!("{:?}", volume_path),
+        ))?;
         let _filename = Self::parse_volume_file_stem_name(volume_path)?;
-        let extension_str = extension
-            .to_str()
-            .ok_or(Error::parse(format! {"{:?} to string", volume_path}))?;
+        let extension_str = extension.to_str().ok_or(Error::parse(
+            "std::path::Path",
+            "&str",
+            format!("{:?}", extension),
+        ))?;
         let naive_volume_path_str = utils::strings::trim_suffix(volume_path_str, extension_str)?;
         let index_file_str = naive_volume_path_str.to_owned() + "index";
         let volume_file_str = naive_volume_path_str.to_owned() + "data";
@@ -98,7 +113,10 @@ impl Volume {
         let (readonly_file, writable_file) = Self::open_volumes(volume_file_str, false)?;
         let current_length = writable_file.metadata()?.len();
         Ok(Volume {
-            volume_path: volume_path.to_str().ok_or(Error::naive(format!("{:?} to string", volume_path)))?.to_owned(),
+            volume_path: volume_path
+                .to_str()
+                .ok_or(Error::naive(format!("{:?} to string", volume_path)))?
+                .to_owned(),
             writable_volume: writable_file,
             readonly_volume: readonly_file,
             current_length,
@@ -109,13 +127,14 @@ impl Volume {
     }
 
     fn parse_volume_file_stem_name(volume_path: &Path) -> Result<usize> {
-        let stem = volume_path.file_stem().ok_or(Error::file_system(format!(
-            "get file_stem from {:?}",
-            volume_path
-        )))?;
-        let stem = stem
-            .to_str()
-            .ok_or(Error::parse(format!("{:?} to string", stem)))?;
+        let stem = volume_path
+            .file_stem()
+            .ok_or(Error::path(format!("get file_stem from {:?}", volume_path)))?;
+        let stem = stem.to_str().ok_or(Error::parse(
+            "&std::ffi::OsStr",
+            "&str",
+            format!("{:?}", stem),
+        ))?;
         let stem = stem.parse::<usize>()?;
         Ok(stem)
     }
