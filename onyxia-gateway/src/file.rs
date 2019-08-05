@@ -52,7 +52,7 @@ impl Stream for FileStream {
         let start = std::time::SystemTime::now();
         let size = self.file.read(&mut self.buffer)?;
         println!(
-            "index: {}, read size: {}, start at {:?}, elasped {:?}",
+            "index: {}, read size: {}, start at {:?}, elapsed {:?}",
             self.index,
             size,
             start,
