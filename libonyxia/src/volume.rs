@@ -6,8 +6,9 @@ use crate::utils;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Seek};
+use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::Receiver;
 
 use serde_json::Deserializer;
 
@@ -42,6 +43,7 @@ impl From<&OsStr> for VolumeExtension {
 
 #[allow(dead_code)]
 pub struct Volume {
+    pub id: usize,
     pub volume_path: String,
     pub writable_volume: File,
     pub readonly_volume: File,
@@ -52,18 +54,18 @@ pub struct Volume {
 }
 
 impl Volume {
-    pub fn new(dir: &Path, index: usize) -> Result<Volume> {
-        let volume_path: PathBuf = dir.join(format!("{}.data", index));
-        let index_path: PathBuf = dir.join(format!("{}.index", index));
+    pub fn new(dir: &Path, id: usize) -> Result<Volume> {
+        let volume_path: PathBuf = dir.join(format!("{}.data", id));
+        let index_path: PathBuf = dir.join(format!("{}.index", id));
         if volume_path.exists() {
             return Err(Error::volume(error::VolumeError::create(
-                index,
+                id,
                 "already exists",
             )));
         }
         if index_path.exists() {
             return Err(Error::index(error::IndexError::create(
-                index,
+                id,
                 "already exists",
             )));
         }
@@ -71,6 +73,7 @@ impl Volume {
         let (readonly_file, writable_file) = Self::open_volumes(&volume_path, false)?;
         let current_length = writable_file.metadata()?.len();
         Ok(Volume {
+            id,
             volume_path: volume_path
                 .to_str()
                 .ok_or(format!("{:?} to string", volume_path))?
@@ -99,7 +102,7 @@ impl Volume {
             "&str",
             format!("{:?}", volume_path),
         ))?;
-        let _filename = Self::parse_volume_file_stem_name(volume_path)?;
+        let id = Self::parse_volume_file_stem_name(volume_path)?;
         let extension_str = extension.to_str().ok_or(Error::parse(
             "std::path::Path",
             "&str",
@@ -112,7 +115,9 @@ impl Volume {
         let (index_file, index_map) = Self::open_indexes(index_file_str, false)?;
         let (readonly_file, writable_file) = Self::open_volumes(volume_file_str, false)?;
         let current_length = writable_file.metadata()?.len();
+        // TODO: check if length of volume data matches to index
         Ok(Volume {
+            id,
             volume_path: volume_path
                 .to_str()
                 .ok_or(Error::naive(format!("{:?} to string", volume_path)))?
@@ -127,16 +132,16 @@ impl Volume {
     }
 
     fn parse_volume_file_stem_name(volume_path: &Path) -> Result<usize> {
-        let stem = volume_path
+        let file_stem = volume_path
             .file_stem()
             .ok_or(Error::path(format!("get file_stem from {:?}", volume_path)))?;
-        let stem = stem.to_str().ok_or(Error::parse(
+        let file_stem_str = file_stem.to_str().ok_or(Error::parse(
             "&std::ffi::OsStr",
             "&str",
-            format!("{:?}", stem),
+            format!("{:?}", file_stem),
         ))?;
-        let stem = stem.parse::<usize>()?;
-        Ok(stem)
+        let id = file_stem_str.parse::<usize>()?;
+        Ok(id)
     }
 
     pub fn writable(&self) -> bool {
@@ -186,8 +191,9 @@ impl Volume {
         if new {
             return Ok((index_file, index_map));
         }
-
-        let reader = std::io::BufReader::new(index_file.try_clone()?);
+        let mut readonly_index_file = index_file.try_clone()?;
+        readonly_index_file.seek(SeekFrom::Start(0))?;
+        let reader = std::io::BufReader::new(readonly_index_file);
         let indexes_reader = Deserializer::from_reader(reader).into_iter::<Index>();
         for index_result in indexes_reader {
             let index: Index = index_result?;
@@ -196,6 +202,63 @@ impl Volume {
         }
 
         Ok((index_file, index_map))
+    }
+
+    pub fn can_write(&self, length: u64) -> bool {
+        if self.readonly() {
+            return false;
+        }
+        let length_after_write = self.current_length + length;
+        return length_after_write < self.max_length;
+    }
+
+    pub fn write(
+        &mut self,
+        path: &str,
+        length: usize,
+        receiver: Receiver<bytes::Bytes>,
+    ) -> Result<()> {
+        if self.readonly() {
+            return Err(Error::volume(error::VolumeError::readonly(self.id)));
+        }
+        if !self.can_write(length as u64) {
+            return Err(Error::volume(error::VolumeError::overflow(
+                self.id,
+                self.max_length,
+                self.current_length,
+                length as u64,
+            )));
+        }
+        let mut received_length = 0usize;
+        self.writable_volume
+            .seek(SeekFrom::Start(self.current_length))?;
+
+        let mut writer = BufWriter::new(self.writable_volume.try_clone()?);
+
+        for data in receiver.iter() {
+            received_length += data.len();
+            writer.write_all(data.as_ref())?;
+        }
+
+        if received_length != length {
+            return Err(Error::volume(error::VolumeError::write_length_mismatch(
+                self.id,
+                path,
+                length,
+                received_length,
+            )));
+        }
+
+        // write index
+        // TODO: supports write-ahead log
+
+        let index = Index::new(path.to_owned(), self.current_length as usize, length);
+        self.index_file
+            .write_all(serde_json::to_string(&index)?.as_bytes())?;
+        self.current_length += length as u64;
+        self.indexes
+            .insert(path.to_owned(), RawIndex::new(index.offset, index.length));
+        Ok(())
     }
 
     pub fn get<K>(&mut self, key: K) -> Result<Needle>
@@ -207,7 +270,7 @@ impl Volume {
             .indexes
             .get(&key)
             .ok_or(Error::not_found(format!("not in indexes: {}", key)))?;
-        if ((index.offset + index.length) as u64) < self.current_length {
+        if ((index.offset + index.length) as u64) > self.current_length {
             return Err(Error::data_corruption(key, "index out of current length"));
         }
         self.readonly_volume
