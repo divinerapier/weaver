@@ -69,7 +69,7 @@ impl Volume {
                 "already exists",
             )));
         }
-        let (index_file, index_map) = Self::open_indexes(index_path, true)?;
+        let (index_file, index_map, _) = Self::open_indexes(index_path, true)?;
         let (readonly_file, writable_file) = Self::open_volumes(&volume_path, false)?;
         let current_length = writable_file.metadata()?.len();
         Ok(Volume {
@@ -112,10 +112,18 @@ impl Volume {
         let index_file_str = naive_volume_path_str.to_owned() + "index";
         let volume_file_str = naive_volume_path_str.to_owned() + "data";
 
-        let (index_file, index_map) = Self::open_indexes(index_file_str, false)?;
+        let (index_file, index_map, last_index) = Self::open_indexes(index_file_str, false)?;
         let (readonly_file, writable_file) = Self::open_volumes(volume_file_str, false)?;
         let current_length = writable_file.metadata()?.len();
-        // TODO: check if length of volume data matches to index
+        if current_length != (last_index.offset + last_index.length) as u64 {
+            return Err(Error::volume(error::VolumeError::data_corruption(
+                id,
+                format!(
+                    "volume current length: {}, last_index.offset: {}, last_index.length: {}",
+                    current_length, last_index.offset, last_index.length
+                ),
+            )));
+        }
         Ok(Volume {
             id,
             volume_path: volume_path
@@ -176,7 +184,7 @@ impl Volume {
     fn open_indexes<P: AsRef<Path>>(
         filepath: P,
         new: bool,
-    ) -> Result<(File, HashMap<String, RawIndex>)> {
+    ) -> Result<(File, HashMap<String, RawIndex>, RawIndex)> {
         let index_file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -189,19 +197,21 @@ impl Volume {
         let mut index_map = HashMap::new();
 
         if new {
-            return Ok((index_file, index_map));
+            return Ok((index_file, index_map, RawIndex::default()));
         }
         let mut readonly_index_file = index_file.try_clone()?;
         readonly_index_file.seek(SeekFrom::Start(0))?;
         let reader = std::io::BufReader::new(readonly_index_file);
         let indexes_reader = Deserializer::from_reader(reader).into_iter::<Index>();
+        let mut last_index = RawIndex::default();
         for index_result in indexes_reader {
             let index: Index = index_result?;
             let raw_index = RawIndex::new(index.offset, index.length);
+            last_index = raw_index;
             index_map.insert(index.path, raw_index);
         }
 
-        Ok((index_file, index_map))
+        Ok((index_file, index_map, last_index))
     }
 
     pub fn can_write(&self, length: u64) -> bool {
