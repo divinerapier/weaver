@@ -19,6 +19,9 @@ pub enum VolumeError {
         todo: u64,
     },
 
+    #[fail(display = "Data corruption. id: {}, cause: {}", id, cause)]
+    DataCorruption { id: usize, cause: String },
+
     #[fail(
         display = "WriteLengthMismatch. id: {}, path: {}, input length: {}, receive length: {}",
         id, path, input_length, receive_length
@@ -51,6 +54,14 @@ impl VolumeError {
             current,
             todo,
         }
+    }
+
+    pub fn data_corruption<C>(id: usize, cause: C) -> VolumeError
+    where
+        C: Into<String>,
+    {
+        let cause = cause.into();
+        VolumeError::DataCorruption { id, cause }
     }
 
     pub fn write_length_mismatch<P>(

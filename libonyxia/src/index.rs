@@ -16,6 +16,7 @@ impl Index {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct RawIndex {
     pub offset: usize,
     pub length: usize,
@@ -24,5 +25,14 @@ pub struct RawIndex {
 impl RawIndex {
     pub fn new(offset: usize, length: usize) -> RawIndex {
         RawIndex { offset, length }
+    }
+}
+
+impl Default for RawIndex {
+    fn default() -> RawIndex {
+        RawIndex {
+            offset: 0,
+            length: 0,
+        }
     }
 }
