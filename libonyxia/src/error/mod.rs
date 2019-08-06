@@ -1,4 +1,5 @@
 use std::io;
+use std::sync::mpsc;
 
 use failure::Fail;
 
@@ -10,8 +11,11 @@ pub use volume_error::VolumeError;
 
 #[derive(Debug, Fail)]
 pub enum Error {
-    #[fail(display = "IO error. {}", _0)]
+    #[fail(display = "IO. {}", _0)]
     IO(#[fail(cause)] io::Error),
+
+    #[fail(display = "Channel. {}", _0)]
+    Channel(String),
 
     #[fail(display = "Data corruption. key: {}, cause: {}", key, cause)]
     DataCorruption { key: String, cause: String },
@@ -42,13 +46,24 @@ pub enum Error {
     FileExists(String),
 
     #[fail(display = "Volume {}", _0)]
-    VolumeError(VolumeError),
+    Volume(VolumeError),
 
     #[fail(display = "Index {}", _0)]
-    IndexError(IndexError),
+    Index(IndexError),
 }
 
 impl Error {
+    pub fn io(e: io::Error) -> Box<Error> {
+        Error::IO(e).into()
+    }
+
+    pub fn channel<C>(c: C) -> Box<Error>
+    where
+        C: Into<String>,
+    {
+        Error::Channel(c.into()).into()
+    }
+
     pub fn data_corruption<S, Q>(key: S, cause: Q) -> Box<Error>
     where
         S: Into<String>,
@@ -93,14 +108,13 @@ impl Error {
     }
 
     pub fn volume(ve: VolumeError) -> Box<Error> {
-        Error::VolumeError(ve).into()
+        Error::Volume(ve).into()
     }
 
     pub fn index(ie: IndexError) -> Box<Error> {
-        Error::IndexError(ie).into()
+        Error::Index(ie).into()
     }
 }
-
 // Box the error in case of large data structure when there is no error.
 pub type Result<T> = std::result::Result<T, Box<Error>>;
 
@@ -125,5 +139,10 @@ impl From<serde_json::error::Error> for std::boxed::Box<Error> {
 impl From<String> for Box<Error> {
     fn from(e: String) -> Self {
         Error::Naive(e).into()
+    }
+}
+impl From<mpsc::SendError<Result<bytes::Bytes>>> for Box<Error> {
+    fn from(e: mpsc::SendError<Result<bytes::Bytes>>) -> Self {
+        Error::Channel(format!("send bytes. {:?}", e)).into()
     }
 }
