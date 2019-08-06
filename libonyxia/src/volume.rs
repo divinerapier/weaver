@@ -1,9 +1,10 @@
 use crate::error::{self, Error, Result};
 use crate::index::{Index, RawIndex};
-use crate::needle::Needle;
+use crate::needle::{Needle, NeedleBody};
 use crate::utils;
 
 use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
@@ -276,22 +277,73 @@ impl Volume {
         K: Into<String>,
     {
         let key = key.into();
-        let index: &RawIndex = self
+        let index: RawIndex = self
             .indexes
             .get(&key)
-            .ok_or(Error::not_found(format!("not in indexes: {}", key)))?;
+            .ok_or(Error::not_found(format!("not in indexes: {}", key)))?
+            .clone();
         if ((index.offset + index.length) as u64) > self.current_length {
             return Err(Error::data_corruption(key, "index out of current length"));
         }
-        self.readonly_volume
-            .seek(std::io::SeekFrom::Start(index.offset as u64))?;
-        let mut buffer = Vec::with_capacity(index.length);
-        buffer.resize(index.length, 0 as u8);
-        self.readonly_volume.read_exact(&mut buffer)?;
+        let body = self.read_needle(&index)?;
         Ok(Needle {
-            body: bytes::Bytes::from(buffer),
+            body: body,
             length: index.length,
         })
+    }
+
+    pub fn read_needle(&mut self, index: &RawIndex) -> Result<NeedleBody> {
+        self.readonly_volume
+            .seek(std::io::SeekFrom::Start(index.offset as u64))?;
+        let batch_size = if index.length > 1024 * 1024 {
+            1024 * 1024 // 1M
+        } else {
+            index.length
+        };
+        let mut buffer = Vec::with_capacity(batch_size);
+        buffer.resize(batch_size, 0 as u8);
+        let mut readonly_volume = self.readonly_volume.try_clone()?;
+        if index.length <= 1024 * 1024 {
+            readonly_volume.read_exact(&mut buffer)?;
+            Ok(NeedleBody::SinglePart(bytes::Bytes::from(buffer)))
+        } else {
+            // TODO: using thread pool
+            let (tx, rx) = std::sync::mpsc::sync_channel(1);
+            let mut remains = index.length;
+            std::thread::spawn(move || {
+                while remains > 0 {
+                    let current = match readonly_volume.read(&mut buffer) {
+                        Ok(current) => current,
+                        Err(e) => {
+                            // NOTE: This function will never panic, but it may return [`Err`]
+                            // if the [`Receiver`] has disconnected and is no longer able to
+                            // receive information.
+                            match tx.send(Err(Error::io(e))) {
+                                Ok(_) => {}
+                                Err(send_error) => {
+                                    println!("failed to send error into channel. {:?}", send_error);
+                                }
+                            }
+                            return;
+                        }
+                    };
+                    remains -= current;
+                    match tx.send(Ok(bytes::Bytes::from(&buffer[0..current]))) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            match tx.send(Err(Error::channel(e.description()))) {
+                                Ok(_) => {}
+                                Err(send_error) => {
+                                    println!("failed to send error into channel. {:?}", send_error);
+                                }
+                            }
+                            return;
+                        }
+                    }
+                }
+            });
+            Ok(NeedleBody::MultiParts(rx))
+        }
     }
 }
 
@@ -332,5 +384,4 @@ mod test {
             assert_eq!(result[i], indexes[i]);
         }
     }
-
 }
