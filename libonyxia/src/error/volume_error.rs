@@ -32,6 +32,11 @@ pub enum VolumeError {
         input_length: usize,
         receive_length: usize,
     },
+    #[fail(display = "Not Found. {}", _0)]
+    NotFound(usize),
+
+    #[fail(display = "Write Needle. path: {}, cause: {}", path, cause)]
+    WriteNeedle { path: String, cause: String },
 }
 
 impl VolumeError {
@@ -80,5 +85,19 @@ impl VolumeError {
             input_length,
             receive_length,
         }
+    }
+
+    pub fn not_found(id: usize) -> VolumeError {
+        VolumeError::NotFound(id)
+    }
+
+    pub fn write_needle<P, C>(path: P, cause: C) -> VolumeError
+    where
+        P: Into<String>,
+        C: Into<String>,
+    {
+        let path = path.into();
+        let cause = cause.into();
+        VolumeError::WriteNeedle { path, cause }
     }
 }
