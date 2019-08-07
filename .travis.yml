@@ -1,0 +1,16 @@
+language: rust
+
+rust:
+  - nightly-2019-08-01
+
+before_install:
+  - rustup show
+
+install: 
+  - true
+
+script: 
+  - cargo test --package libonyxia
+
+cache:
+  - cargo
