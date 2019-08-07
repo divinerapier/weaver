@@ -9,7 +9,6 @@ use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::Receiver;
 
 use serde_json::Deserializer;
 
@@ -286,7 +285,7 @@ impl Volume {
         Ok(())
     }
 
-    pub fn get<K>(&mut self, key: K) -> Result<Needle>
+    pub fn get<K>(&self, key: K) -> Result<Needle>
     where
         K: Into<String>,
     {
@@ -306,9 +305,9 @@ impl Volume {
         })
     }
 
-    pub fn read_needle(&mut self, index: &RawIndex) -> Result<NeedleBody> {
-        self.readonly_volume
-            .seek(std::io::SeekFrom::Start(index.offset as u64))?;
+    pub fn read_needle(&self, index: &RawIndex) -> Result<NeedleBody> {
+        let mut readonly_volume = self.readonly_volume.try_clone()?;
+        readonly_volume.seek(std::io::SeekFrom::Start(index.offset as u64))?;
         let batch_size = if index.length > 1024 * 1024 {
             1024 * 1024 // 1M
         } else {
