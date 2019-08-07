@@ -1,4 +1,4 @@
-use crate::needle::{Needle, NeedleBody};
+use crate::needle::Needle;
 use crate::volume::Volume;
 
 use crate::error::{self, Error, Result};
@@ -57,9 +57,9 @@ impl Directory {
         Ok(result)
     }
 
-    /// upload appends the body to any avaiable volume and
+    /// write appends the body to any available volume and
     /// then records the offset and body size to index file
-    pub fn upload<K>(&mut self, path: K, body: Needle) -> Result<()>
+    pub fn write<K>(&mut self, path: K, body: Needle) -> Result<()>
     where
         K: Into<String>,
     {
@@ -79,7 +79,26 @@ impl Directory {
         volume.write_needle(&path, body)
     }
 
-    pub fn random_writable_volume(&self) -> Option<usize> {
+    pub fn read<K>(&self, key: K) -> Result<Needle>
+    where
+        K: Into<String>,
+    {
+        let key = key.into();
+        let volume_id = self
+            .needle_map
+            .get(&key)
+            .ok_or(Error::not_found(format!("path: {}", key)))?;
+        let volume: &Volume = self
+            .volumes
+            .get(*volume_id)
+            .ok_or(Error::not_found(format!(
+                "path: {}, got volume id: {}",
+                key, *volume_id
+            )))?;
+        volume.get(key)
+    }
+
+    fn random_writable_volume(&self) -> Option<usize> {
         if self.writable_volumes.len() == 0 {
             return None;
         }
@@ -87,16 +106,6 @@ impl Directory {
             return Some(*i);
         }
         None
-    }
-
-    pub fn download<K>(&self, key: K) -> Option<Needle>
-    where
-        K: Into<String>,
-    {
-        let key = key.into();
-        let index = self.needle_map.get(&key)?;
-        let volume: &Volume = self.volumes.get(*index)?;
-        unimplemented!()
     }
 }
 
