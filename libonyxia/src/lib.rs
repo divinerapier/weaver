@@ -1,3 +1,5 @@
+#![feature(try_trait)]
+
 pub mod directory;
 pub mod error;
 pub mod index;

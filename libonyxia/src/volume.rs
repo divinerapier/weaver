@@ -215,7 +215,7 @@ impl Volume {
         Ok((index_file, index_map, last_index))
     }
 
-    pub fn can_write(&self, length: u64) -> bool {
+    fn can_write(&self, length: u64) -> bool {
         if self.readonly() {
             return false;
         }
@@ -223,15 +223,11 @@ impl Volume {
         return length_after_write < self.max_length;
     }
 
-    pub fn write(
-        &mut self,
-        path: &str,
-        length: usize,
-        receiver: Receiver<bytes::Bytes>,
-    ) -> Result<()> {
+    pub fn write_needle(&mut self, path: &str, needle: Needle) -> Result<()> {
         if self.readonly() {
             return Err(Error::volume(error::VolumeError::readonly(self.id)));
         }
+        let length = needle.length;
         if !self.can_write(length as u64) {
             return Err(Error::volume(error::VolumeError::overflow(
                 self.id,
@@ -246,9 +242,27 @@ impl Volume {
 
         let mut writer = BufWriter::new(self.writable_volume.try_clone()?);
 
-        for data in receiver.iter() {
-            received_length += data.len();
-            writer.write_all(data.as_ref())?;
+        match needle.body {
+            NeedleBody::SinglePart(data) => {
+                received_length += data.len();
+                writer.write_all(data.as_ref())?;
+            }
+            NeedleBody::MultiParts(receiver) => {
+                for data in receiver.iter() {
+                    match data {
+                        Ok(data) => {
+                            received_length += data.len();
+                            writer.write_all(data.as_ref())?;
+                        }
+                        Err(e) => {
+                            return Err(Error::volume(error::VolumeError::write_needle(
+                                path,
+                                format!("{:?}", e),
+                            )));
+                        }
+                    }
+                }
+            }
         }
 
         if received_length != length {
