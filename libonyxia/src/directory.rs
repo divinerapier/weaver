@@ -1,13 +1,15 @@
-use crate::needle::Needle;
+use crate::needle::{Needle, NeedleBody};
 use crate::volume::Volume;
 
-use crate::error::{Error, Result};
+use crate::error::{self, Error, Result};
 
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::ops::Try;
+use std::path::{Path, PathBuf};
 
 #[allow(dead_code)]
 pub struct Directory {
+    pub volumes_dir: PathBuf,
     pub volumes: Vec<Volume>,
     pub writable_volumes: HashSet<usize>,
     pub readonly_volumes: HashSet<usize>,
@@ -25,6 +27,7 @@ impl Directory {
         P: AsRef<Path>,
     {
         let mut result = Directory::default();
+        result.volumes_dir = PathBuf::from(path.as_ref());
         let dir: std::fs::ReadDir = std::fs::read_dir(path)?;
         for entry in dir {
             let entry = entry?;
@@ -56,11 +59,34 @@ impl Directory {
 
     /// upload appends the body to any avaiable volume and
     /// then records the offset and body size to index file
-    pub fn upload<K>(&mut self, key: K, body: Needle)
+    pub fn upload<K>(&mut self, path: K, body: Needle) -> Result<()>
     where
         K: Into<String>,
     {
-        unimplemented!()
+        let volume_id =
+            self.random_writable_volume()
+                .into_result()
+                .or_else(|_| -> Result<usize> {
+                    let volume = Volume::new(&self.volumes_dir, self.volumes.len())?;
+                    Ok(volume.id)
+                })?;
+        let volume: &mut Volume = self
+            .volumes
+            .get_mut(volume_id)
+            .ok_or(Error::volume(error::VolumeError::not_found(volume_id)))?;
+        let path = path.into();
+        self.needle_map.insert(path.clone(), volume_id);
+        volume.write_needle(&path, body)
+    }
+
+    pub fn random_writable_volume(&self) -> Option<usize> {
+        if self.writable_volumes.len() == 0 {
+            return None;
+        }
+        for i in self.writable_volumes.iter() {
+            return Some(*i);
+        }
+        None
     }
 
     pub fn download<K>(&self, key: K) -> Option<Needle>
@@ -77,6 +103,7 @@ impl Directory {
 impl Default for Directory {
     fn default() -> Directory {
         Directory {
+            volumes_dir: PathBuf::default(),
             volumes: vec![],
             writable_volumes: HashSet::new(),
             readonly_volumes: HashSet::new(),
