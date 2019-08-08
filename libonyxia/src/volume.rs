@@ -1,7 +1,7 @@
 use crate::error::{self, Error, Result};
 use crate::index::{Index, RawIndex};
 use crate::needle::{Needle, NeedleBody};
-use crate::utils;
+use crate::utils::{self, size::Size};
 
 use std::collections::HashMap;
 use std::error::Error as StdError;
@@ -17,8 +17,6 @@ pub enum VolumeExtension {
     Data = 2,
     Unknown = 99,
 }
-
-const MAX_VOLUME_SIZE: u64 = 1 * (2 << 30);
 
 impl From<&str> for VolumeExtension {
     fn from(t: &str) -> VolumeExtension {
@@ -54,7 +52,7 @@ pub struct Volume {
 }
 
 impl Volume {
-    pub fn new(dir: &Path, id: usize) -> Result<Volume> {
+    pub fn new(dir: &Path, id: usize, size: Size) -> Result<Volume> {
         let volume_path: PathBuf = dir.join(format!("{}.data", id));
         let index_path: PathBuf = dir.join(format!("{}.index", id));
         if volume_path.exists() {
@@ -81,7 +79,7 @@ impl Volume {
             writable_volume: writable_file,
             readonly_volume: readonly_file,
             current_length,
-            max_length: MAX_VOLUME_SIZE,
+            max_length: size.into(),
             index_file,
             indexes: index_map,
         })
@@ -89,7 +87,7 @@ impl Volume {
 
     /// open a physical volume file from disk
     /// volume_path is the
-    pub fn open(volume_path: &Path) -> Result<Volume> {
+    pub fn open(volume_path: &Path, size: Size) -> Result<Volume> {
         let extension = volume_path.extension().ok_or(Error::path(
             format! {"get file_stem from {:?}", volume_path},
         ))?;
@@ -133,7 +131,7 @@ impl Volume {
             writable_volume: writable_file,
             readonly_volume: readonly_file,
             current_length,
-            max_length: MAX_VOLUME_SIZE,
+            max_length: size.into(),
             index_file,
             indexes: index_map,
         })
