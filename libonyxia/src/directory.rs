@@ -2,6 +2,7 @@ use crate::needle::Needle;
 use crate::volume::Volume;
 
 use crate::error::{self, Error, Result};
+use crate::utils::size::Size;
 
 use std::collections::{HashMap, HashSet};
 use std::ops::Try;
@@ -16,23 +17,28 @@ pub struct Directory {
 
     /// map from file path to volume index in self.volumes
     pub needle_map: HashMap<String, usize>,
+
+    pub volume_size: Size,
 }
 
 #[allow(dead_code, unused)]
 impl Directory {
     /// new opens the storage by specified path
     /// and also loads the indexes
-    pub fn new<P>(path: P) -> Result<Directory>
+    pub fn new<P>(path: P, volume_size: Size) -> Result<Directory>
     where
         P: AsRef<Path>,
     {
-        let mut result = Directory::default();
-        result.volumes_dir = PathBuf::from(path.as_ref());
+        let mut result = Directory {
+            volumes_dir: PathBuf::from(path.as_ref()),
+            volume_size,
+            ..Directory::default()
+        };
         let dir: std::fs::ReadDir = std::fs::read_dir(path)?;
         for entry in dir {
             let entry = entry?;
             let inner_file_path: std::path::PathBuf = entry.path();
-            Volume::open(inner_file_path.as_path()).map(|volume| -> Result<()> {
+            Volume::open(inner_file_path.as_path(), volume_size).map(|volume| -> Result<()> {
                 let volume: Volume = volume;
                 let index = result.volumes.len();
                 let writable = volume.writable();
@@ -67,7 +73,8 @@ impl Directory {
             self.random_writable_volume()
                 .into_result()
                 .or_else(|_| -> Result<usize> {
-                    let volume = Volume::new(&self.volumes_dir, self.volumes.len())?;
+                    let volume =
+                        Volume::new(&self.volumes_dir, self.volumes.len(), self.volume_size)?;
                     Ok(volume.id)
                 })?;
         let volume: &mut Volume = self
@@ -117,6 +124,7 @@ impl Default for Directory {
             writable_volumes: HashSet::new(),
             readonly_volumes: HashSet::new(),
             needle_map: HashMap::new(),
+            volume_size: Size::default(),
         }
     }
 }
