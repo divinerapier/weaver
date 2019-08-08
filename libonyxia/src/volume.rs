@@ -68,7 +68,7 @@ impl Volume {
             )));
         }
         let (index_file, index_map, _) = Self::open_indexes(index_path, true)?;
-        let (readonly_file, writable_file) = Self::open_volumes(&volume_path, false)?;
+        let (readonly_file, writable_file) = Self::open_volumes(&volume_path, true)?;
         let current_length = writable_file.metadata()?.len();
         Ok(Volume {
             id,
@@ -158,6 +158,14 @@ impl Volume {
         !self.writable()
     }
 
+    pub fn available_length(&self) -> u64 {
+        if self.max_length > self.current_length {
+            self.max_length - self.current_length
+        } else {
+            0
+        }
+    }
+
     fn open_volumes<P: AsRef<Path>>(volume_filepath: P, new: bool) -> Result<(File, File)> {
         let writable_file: File = OpenOptions::new()
             .read(true)
@@ -166,15 +174,12 @@ impl Volume {
             .create(new)
             .create_new(new)
             .truncate(false)
-            .open(volume_filepath.as_ref())?;
-        let readonly_file: File = OpenOptions::new()
-            .read(true)
-            .write(false)
-            .append(false)
-            .create(new)
-            .create_new(new)
-            .truncate(false)
-            .open(volume_filepath)?;
+            .open(volume_filepath.as_ref())
+            .expect(&format!("volume filepath: {:?}", volume_filepath.as_ref()));
+        let readonly_file = writable_file.try_clone().expect(&format!(
+            "try clone volume filepath: {:?}",
+            volume_filepath.as_ref()
+        ));
 
         Ok((readonly_file, writable_file))
     }
@@ -220,7 +225,7 @@ impl Volume {
         return length_after_write < self.max_length;
     }
 
-    pub fn write_needle(&mut self, path: &str, needle: Needle) -> Result<()> {
+    pub fn write_needle(&mut self, path: &str, needle: &Needle) -> Result<()> {
         if self.readonly() {
             return Err(Error::volume(error::VolumeError::readonly(self.id)));
         }
@@ -238,8 +243,8 @@ impl Volume {
             .seek(SeekFrom::Start(self.current_length))?;
 
         let mut writer = BufWriter::new(self.writable_volume.try_clone()?);
-
-        match needle.body {
+        let mut wrote = 0;
+        match &needle.body {
             NeedleBody::SinglePart(data) => {
                 received_length += data.len();
                 writer.write_all(data.as_ref())?;
@@ -258,6 +263,8 @@ impl Volume {
                             )));
                         }
                     }
+                    wrote += 1;
+                    println!("wrote multiparts. {}", wrote);
                 }
             }
         }
