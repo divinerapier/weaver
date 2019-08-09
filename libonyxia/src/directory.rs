@@ -80,6 +80,10 @@ impl Directory {
                 path,
                 volume_error
             );
+            if volume_error.is_retriable() && retry_times > 0 {
+                retry_times -= 1;
+                continue;
+            }
             return Err(volume_error);
         }
         Ok(())
@@ -97,6 +101,10 @@ impl Directory {
         let path = path.into();
         volume.write_needle(&path, &body)?;
         self.needle_map.insert(path.clone(), volume.id);
+        if volume.readonly() {
+            self.writable_volumes.remove(&volume_id);
+            self.readonly_volumes.insert(volume_id);
+        }
         Ok(())
     }
 
@@ -145,7 +153,9 @@ impl Directory {
                 volume.current_length,
                 length
             );
-            return Err(Error::directory(error::DirectoryError::GetWritableVolume));
+            return Err(Error::retry(Error::directory(
+                error::DirectoryError::GetWritableVolume,
+            )));
         }
         Ok(volume.id)
     }
@@ -169,6 +179,7 @@ impl Directory {
         Ok(volume.get(key)?)
     }
 
+    // TODO: this is not randomly, different from golang
     fn random_writable_volume(&self) -> Option<usize> {
         if self.writable_volumes.len() == 0 {
             return None;
@@ -312,5 +323,35 @@ mod test {
             // TODO: test read multiparts
             NeedleBody::MultiParts(body_chain) => {}
         }
+    }
+
+    fn hashset_pop_range<'a>(set: &'a HashSet<i32>) -> Option<&'a i32> {
+        for i in set.iter() {
+            return Some(i);
+        }
+        None
+    }
+
+    #[test]
+    fn test_hashset_pop_in_range() {
+        // Note: this behavior is not same as golang
+        let mut set = HashSet::new();
+        set.insert(1);
+        set.insert(2);
+        set.insert(3);
+        set.insert(4);
+        set.insert(5);
+        set.insert(6);
+        let a1 = hashset_pop_range(&set);
+        let a2 = hashset_pop_range(&set);
+        let a3 = hashset_pop_range(&set);
+        let a4 = hashset_pop_range(&set);
+        let a5 = hashset_pop_range(&set);
+        let a6 = hashset_pop_range(&set);
+        assert_eq!(a1, a2);
+        assert_eq!(a1, a3);
+        assert_eq!(a1, a4);
+        assert_eq!(a1, a5);
+        assert_eq!(a1, a6);
     }
 }
