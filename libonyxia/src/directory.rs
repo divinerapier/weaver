@@ -1,8 +1,7 @@
-use crate::needle::Needle;
-use crate::volume::Volume;
-
 use crate::error::{self, Error, Result};
+use crate::needle::Needle;
 use crate::utils::size::Size;
+use crate::volume::Volume;
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
@@ -63,6 +62,8 @@ impl Directory {
                 Ok(())
             });
         }
+        // should sort volumes by volume.id
+        result.volumes.sort_by_key(|e| e.id);
         Ok(result)
     }
 
@@ -101,7 +102,7 @@ impl Directory {
         let path = path.into();
         volume.write_needle(&path, &body)?;
         self.needle_map.insert(path.clone(), volume.id);
-        if volume.readonly() {
+        if !volume.writable() {
             self.writable_volumes.remove(&volume_id);
             self.readonly_volumes.insert(volume_id);
         }
@@ -179,15 +180,19 @@ impl Directory {
         Ok(volume.get(key)?)
     }
 
-    // TODO: this is not randomly, different from golang
+    // Notice: this is not randomly, different from golang
+    // I have no idea about how to test it
     fn random_writable_volume(&self) -> Option<usize> {
-        if self.writable_volumes.len() == 0 {
+        use rand::Rng;
+        let length = self.writable_volumes.len();
+        if length == 0 {
             return None;
         }
-        for i in self.writable_volumes.iter() {
-            return Some(*i);
-        }
-        None
+        let index = rand::thread_rng().gen::<i64>() as usize;
+        let index = index % self.writable_volumes.len();
+        let volume_id = self.writable_volumes.iter().skip(index).next()?;
+        assert_eq!(length, self.writable_volumes.len());
+        Some(*volume_id)
     }
 }
 
@@ -334,7 +339,7 @@ mod test {
 
     #[test]
     fn test_hashset_pop_in_range() {
-        // Note: this behavior is not same as golang
+        // Notice: this behavior is not same as golang
         let mut set = HashSet::new();
         set.insert(1);
         set.insert(2);
