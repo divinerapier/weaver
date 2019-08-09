@@ -3,13 +3,13 @@ use std::sync::mpsc;
 
 use failure::Fail;
 
+mod directory_error;
 mod index_error;
 mod volume_error;
-mod directory_error;
 
+pub use directory_error::DirectoryError;
 pub use index_error::IndexError;
 pub use volume_error::VolumeError;
-pub use directory_error::DirectoryError;
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -55,9 +55,13 @@ pub enum Error {
 
     #[fail(display = "Index {}", _0)]
     Index(IndexError),
+
+    #[fail(display = "Retriable {}", _0)]
+    Retriable(Box<Error>),
 }
 
 impl Error {
+    // constructor
     pub fn io(e: io::Error) -> Box<Error> {
         Error::IO(e).into()
     }
@@ -122,6 +126,18 @@ impl Error {
 
     pub fn index(ie: IndexError) -> Box<Error> {
         Error::Index(ie).into()
+    }
+
+    pub fn retry(e: Box<Error>) -> Box<Error> {
+        Error::Retriable(e).into()
+    }
+
+    // validator
+    pub fn is_retriable(&self) -> bool {
+        if let Error::Retriable(_) = self {
+            return true;
+        }
+        false
     }
 }
 // Box the error in case of large data structure when there is no error.
