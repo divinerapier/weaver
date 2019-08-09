@@ -11,6 +11,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
+use serde::Serialize;
 use serde_json::Deserializer;
 
 pub enum VolumeExtension {
@@ -40,14 +41,17 @@ impl From<&OsStr> for VolumeExtension {
     }
 }
 
-#[allow(dead_code)]
+#[derive(Serialize)]
 pub struct Volume {
     pub id: usize,
     pub volume_path: String,
+    #[serde(skip_serializing)]
     pub writable_volume: File,
+    #[serde(skip_serializing)]
     pub readonly_volume: File,
     pub current_length: u64,
     pub max_length: u64,
+    #[serde(skip_serializing)]
     pub index_file: File,
     pub indexes: HashMap<String, RawIndex>,
 }
@@ -184,6 +188,14 @@ impl Volume {
         }
     }
 
+    pub fn info(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
+    pub fn pretty_info(&self) -> String {
+        serde_json::to_string_pretty(self).unwrap()
+    }
+
     fn open_volumes<P: AsRef<Path>>(volume_filepath: P, new: bool) -> Result<(File, File)> {
         let writable_file: File = OpenOptions::new()
             .read(true)
@@ -255,12 +267,12 @@ impl Volume {
                 self.current_length,
                 needle.length
             );
-            return Err(Error::volume(error::VolumeError::overflow(
+            return Err(Error::retry(Error::volume(error::VolumeError::overflow(
                 self.id,
                 self.max_length,
                 self.current_length,
                 length as u64,
-            )));
+            ))));
         }
         let mut received_length = 0usize;
         self.writable_volume
@@ -332,7 +344,10 @@ impl Volume {
         let index: RawIndex = self
             .indexes
             .get(&path)
-            .ok_or(Error::not_found(format!("not in indexes: {}", path)))?
+            .ok_or(Error::not_found(format!(
+                "not in indexes: {}, indexes: {:?}",
+                path, self.indexes
+            )))?
             .clone();
         if ((index.offset + index.length) as u64) > self.current_length {
             log::error!(

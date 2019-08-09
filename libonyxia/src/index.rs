@@ -16,7 +16,7 @@ impl Index {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, serde::Serialize)]
 pub struct RawIndex {
     pub offset: usize,
     pub length: usize,
