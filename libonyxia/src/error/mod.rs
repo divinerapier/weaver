@@ -5,9 +5,11 @@ use failure::Fail;
 
 mod index_error;
 mod volume_error;
+mod directory_error;
 
 pub use index_error::IndexError;
 pub use volume_error::VolumeError;
+pub use directory_error::DirectoryError;
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -47,6 +49,9 @@ pub enum Error {
 
     #[fail(display = "Volume {}", _0)]
     Volume(VolumeError),
+
+    #[fail(display = "Directory {}", _0)]
+    Directory(DirectoryError),
 
     #[fail(display = "Index {}", _0)]
     Index(IndexError),
@@ -109,6 +114,10 @@ impl Error {
 
     pub fn volume(ve: VolumeError) -> Box<Error> {
         Error::Volume(ve).into()
+    }
+
+    pub fn directory(de: DirectoryError) -> Box<Error> {
+        Error::Directory(de).into()
     }
 
     pub fn index(ie: IndexError) -> Box<Error> {
