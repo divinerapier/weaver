@@ -5,6 +5,7 @@ use crate::error::{self, Error, Result};
 use crate::utils::size::Size;
 
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::ops::Try;
 use std::path::{Path, PathBuf};
 
@@ -69,11 +70,16 @@ impl Directory {
     /// then records the offset and body size to index file
     pub fn write<K>(&mut self, path: K, body: Needle) -> Result<()>
     where
-        K: Into<String> + Clone,
+        K: Into<String> + Clone + Display,
     {
         // TODO: retry on failure. eg: add a error type: RetriableError(Box<Error>)
         let mut retry_times = 3;
         while let Err(volume_error) = self.try_write(path.clone(), &body) {
+            log::error!(
+                "directory try write. path: {}, error: {}",
+                path,
+                volume_error
+            );
             return Err(volume_error);
         }
         Ok(())
@@ -83,14 +89,13 @@ impl Directory {
     where
         K: Into<String>,
     {
-        let mut volume_id = self.get_writable_volume(body.length).unwrap();
+        let mut volume_id = self.get_writable_volume(body.length)?;
         let volume: &mut Volume = self
             .volumes
             .get_mut(volume_id)
-            .ok_or(Error::volume(error::VolumeError::not_found(volume_id)))
-            .unwrap();
+            .ok_or(Error::volume(error::VolumeError::not_found(volume_id)))?;
         let path = path.into();
-        volume.write_needle(&path, &body).unwrap();
+        volume.write_needle(&path, &body)?;
         self.needle_map.insert(path.clone(), volume.id);
         Ok(())
     }
@@ -106,8 +111,7 @@ impl Directory {
                         continue;
                     } else {
                         let volume =
-                            Volume::new(&self.volumes_dir, self.volumes.len(), self.volume_size)
-                                .unwrap();
+                            Volume::new(&self.volumes_dir, self.volumes.len(), self.volume_size)?;
                         let volume_id = volume.id;
                         self.volumes.push(volume);
                         self.writable_volumes.insert(volume_id);
@@ -119,24 +123,28 @@ impl Directory {
     }
 
     fn try_get_writable_volume(&mut self, length: usize) -> Result<usize> {
-        let volume_id = self
-            .random_writable_volume()
-            .into_result()
-            .or_else(|_| -> Result<usize> {
-                let volume =
-                    Volume::new(&self.volumes_dir, self.volumes.len(), self.volume_size).unwrap();
-                let volume_id = volume.id;
-                self.volumes.push(volume);
-                self.writable_volumes.insert(volume_id);
-                Ok(volume_id)
-            })
-            .unwrap();
+        let volume_id =
+            self.random_writable_volume()
+                .into_result()
+                .or_else(|_| -> Result<usize> {
+                    let volume =
+                        Volume::new(&self.volumes_dir, self.volumes.len(), self.volume_size)?;
+                    let volume_id = volume.id;
+                    self.volumes.push(volume);
+                    self.writable_volumes.insert(volume_id);
+                    Ok(volume_id)
+                })?;
         let volume: &mut Volume = self
             .volumes
             .get_mut(volume_id)
-            .ok_or(Error::volume(error::VolumeError::not_found(volume_id)))
-            .unwrap();
+            .ok_or(Error::volume(error::VolumeError::not_found(volume_id)))?;
         if volume.max_length - volume.current_length < length as u64 {
+            log::warn!(
+                "volume almost full. max: {}, current: {}, todo: {}",
+                volume.max_length,
+                volume.current_length,
+                length
+            );
             return Err(Error::directory(error::DirectoryError::GetWritableVolume));
         }
         Ok(volume.id)
@@ -158,7 +166,7 @@ impl Directory {
                 "path: {}, got volume id: {}",
                 key, *volume_id
             )))?;
-        Ok(volume.get(key).unwrap())
+        Ok(volume.get(key)?)
     }
 
     fn random_writable_volume(&self) -> Option<usize> {
@@ -193,23 +201,25 @@ mod test {
 
     #[test]
     fn foo1() {
+        env_logger::init();
+        log::log_enabled!(log::Level::Trace);
         let testdata_dir = env::current_dir().unwrap().join("testdata");
-        std::fs::remove_dir_all(testdata_dir.as_path());
+        // std::fs::remove_dir_all(testdata_dir.as_path());
         std::fs::create_dir_all(testdata_dir.as_path()).unwrap();
         let mut directory = Directory::new(testdata_dir.as_path(), Size::byte(100)).unwrap();
-        let data1 = bytes::Bytes::from("data1: hello world data1");
-        let data2 = bytes::Bytes::from("data2: hello world data2");
-        let data3 = bytes::Bytes::from("data3: hello world data3");
-        let data4 = bytes::Bytes::from("data4: hello world data4");
-        let data5 = bytes::Bytes::from("data5: hello world data5");
-        let data6 = bytes::Bytes::from("data6: hello world data6");
-        let data7_1 = bytes::Bytes::from("data7_1: hello world data7_1");
-        let data7_2 = bytes::Bytes::from("data7_2: hello world data7_2");
-        let data7_3 = bytes::Bytes::from("data7_3: hello world data7_3");
+        let data1 = bytes::Bytes::from("data1: hello world data1\n");
+        let data2 = bytes::Bytes::from("data2: hello world data2\n");
+        let data3 = bytes::Bytes::from("data3: hello world data3\n");
+        let data4 = bytes::Bytes::from("data4: hello world data4\n");
+        let data5 = bytes::Bytes::from("data5: hello world data5\n");
+        let data6 = bytes::Bytes::from("data6: hello world data6\n");
+        let data7_1 = bytes::Bytes::from("data7_1: hello world data7_1\n");
+        let data7_2 = bytes::Bytes::from("data7_2: hello world data7_2\n");
+        let data7_3 = bytes::Bytes::from("data7_3: hello world data7_3\n");
         // write
         {
             {
-                println!("test1",);
+                log::debug!("test1",);
                 let needle = Needle {
                     length: data1.len(),
                     body: NeedleBody::SinglePart(data1),
@@ -217,7 +227,7 @@ mod test {
                 directory.write("/path/to/file/1", needle).unwrap();
             }
             {
-                println!("test2",);
+                log::debug!("test2",);
                 let needle = Needle {
                     length: data2.len(),
                     body: NeedleBody::SinglePart(data2),
@@ -225,7 +235,7 @@ mod test {
                 directory.write("/path/to/file/2", needle).unwrap();
             }
             {
-                println!("test3",);
+                log::debug!("test3",);
                 let needle = Needle {
                     length: data3.len(),
                     body: NeedleBody::SinglePart(data3),
@@ -233,7 +243,7 @@ mod test {
                 directory.write("/path/to/file/3", needle).unwrap();
             }
             {
-                println!("test4",);
+                log::debug!("test4",);
                 let needle = Needle {
                     length: data4.len(),
                     body: NeedleBody::SinglePart(data4),
@@ -241,7 +251,7 @@ mod test {
                 directory.write("/path/to/file/4", needle).unwrap();
             }
             {
-                println!("test5",);
+                log::debug!("test5",);
                 let needle = Needle {
                     length: data5.len(),
                     body: NeedleBody::SinglePart(data5),
@@ -249,7 +259,7 @@ mod test {
                 directory.write("/path/to/file/5", needle).unwrap();
             }
             {
-                println!("test6",);
+                log::debug!("test6",);
                 let needle = Needle {
                     length: data6.len(),
                     body: NeedleBody::SinglePart(data6),
@@ -257,7 +267,7 @@ mod test {
                 directory.write("/path/to/file/6", needle).unwrap();
             }
             {
-                println!("test7",);
+                log::debug!("test7",);
                 let (tx, rx) = std::sync::mpsc::channel();
                 let length = data7_1.len() + data7_2.len() + data7_3.len();
                 std::thread::spawn(move || {
@@ -276,19 +286,19 @@ mod test {
         // read
         {
             let needle1 = directory.read("/path/to/file/1").unwrap();
-            check_needle_body(needle1, "data1: hello world data1");
+            check_needle_body(needle1, "data1: hello world data1\n");
             let needle2 = directory.read("/path/to/file/2").unwrap();
-            check_needle_body(needle2, "data2: hello world data2");
+            check_needle_body(needle2, "data2: hello world data2\n");
             let needle3 = directory.read("/path/to/file/3").unwrap();
-            check_needle_body(needle3, "data3: hello world data3");
+            check_needle_body(needle3, "data3: hello world data3\n");
             let needle4 = directory.read("/path/to/file/4").unwrap();
-            check_needle_body(needle4, "data4: hello world data4");
+            check_needle_body(needle4, "data4: hello world data4\n");
             let needle5 = directory.read("/path/to/file/5").unwrap();
-            check_needle_body(needle5, "data5: hello world data5");
+            check_needle_body(needle5, "data5: hello world data5\n");
             let needle6 = directory.read("/path/to/file/6").unwrap();
-            check_needle_body(needle6, "data6: hello world data6");
+            check_needle_body(needle6, "data6: hello world data6\n");
             let needle7 = directory.read("/path/to/file/7").unwrap();
-            check_needle_body(needle7, "data7_1: hello world data7_1data7_2: hello world data7_2data7_3: hello world data7_3");
+            check_needle_body(needle7, "data7_1: hello world data7_1\ndata7_2: hello world data7_2\ndata7_3: hello world data7_3\n");
         }
     }
 
