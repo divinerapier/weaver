@@ -6,6 +6,7 @@ use crate::utils::{self, size::Size};
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::ffi::OsStr;
+use std::fmt::Display;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -56,12 +57,22 @@ impl Volume {
         let volume_path: PathBuf = dir.join(format!("{}.data", id));
         let index_path: PathBuf = dir.join(format!("{}.index", id));
         if volume_path.exists() {
+            log::error!(
+                "couldn't create the volume data which exists already. id: {}, path: {}",
+                id,
+                volume_path.display()
+            );
             return Err(Error::volume(error::VolumeError::create(
                 id,
                 "already exists",
             )));
         }
         if index_path.exists() {
+            log::error!(
+                "couldn't create the volume index which exists already. id: {}, path: {}",
+                id,
+                index_path.display()
+            );
             return Err(Error::index(error::IndexError::create(
                 id,
                 "already exists",
@@ -114,6 +125,13 @@ impl Volume {
         let (readonly_file, writable_file) = Self::open_volumes(volume_file_str, false)?;
         let current_length = writable_file.metadata()?.len();
         if current_length != (last_index.offset + last_index.length) as u64 {
+            log::error!(
+                "volume data corruption. path: {}, current_length: {}, last_index.offset: {}, last_index.length: {}",
+                volume_path.display(),
+                current_length,
+                last_index.offset,
+                last_index.length
+            );
             return Err(Error::volume(error::VolumeError::data_corruption(
                 id,
                 format!(
@@ -222,15 +240,21 @@ impl Volume {
             return false;
         }
         let length_after_write = self.current_length + length;
-        return length_after_write < self.max_length;
+        return length_after_write <= self.max_length;
     }
 
     pub fn write_needle(&mut self, path: &str, needle: &Needle) -> Result<()> {
-        if self.readonly() {
-            return Err(Error::volume(error::VolumeError::readonly(self.id)));
-        }
         let length = needle.length;
         if !self.can_write(length as u64) {
+            log::error!(
+                "couldn't write to the volume. id: {}, path: {}, writable: {}, max_length: {}, current_length: {}, todo: {}",
+                self.id,
+                self.volume_path,
+                self.writable(),
+                self.max_length,
+                self.current_length,
+                needle.length
+            );
             return Err(Error::volume(error::VolumeError::overflow(
                 self.id,
                 self.max_length,
@@ -257,6 +281,11 @@ impl Volume {
                             writer.write_all(data.as_ref())?;
                         }
                         Err(e) => {
+                            log::error!(
+                                "failed to receive multiparts body. path: {}, error: {}",
+                                path,
+                                e
+                            );
                             return Err(Error::volume(error::VolumeError::write_needle(
                                 path,
                                 format!("{:?}", e),
@@ -264,12 +293,17 @@ impl Volume {
                         }
                     }
                     wrote += 1;
-                    println!("wrote multiparts. {}", wrote);
+                    log::debug!("wrote multiparts. {}", wrote);
                 }
             }
         }
 
         if received_length != length {
+            log::error!(
+                "mismatched needle length. received: {}, announced: {}",
+                received_length,
+                length
+            );
             return Err(Error::volume(error::VolumeError::write_length_mismatch(
                 self.id,
                 path,
@@ -290,18 +324,25 @@ impl Volume {
         Ok(())
     }
 
-    pub fn get<K>(&self, key: K) -> Result<Needle>
+    pub fn get<K>(&self, path: K) -> Result<Needle>
     where
-        K: Into<String>,
+        K: Into<String> + Display,
     {
-        let key = key.into();
+        let path = path.into();
         let index: RawIndex = self
             .indexes
-            .get(&key)
-            .ok_or(Error::not_found(format!("not in indexes: {}", key)))?
+            .get(&path)
+            .ok_or(Error::not_found(format!("not in indexes: {}", path)))?
             .clone();
         if ((index.offset + index.length) as u64) > self.current_length {
-            return Err(Error::data_corruption(key, "index out of current length"));
+            log::error!(
+                "volume data corruption. path: {}, volume_length: {}, index.offset: {}, index.length: {}",
+                path,
+                self.current_length,
+                index.offset,
+                index.length
+            );
+            return Err(Error::data_corruption(path, "index out of current length"));
         }
         let body = self.read_needle(&index)?;
         Ok(Needle {
