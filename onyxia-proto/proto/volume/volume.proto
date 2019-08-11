@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+message VolumeWriteFileRequest {
+  string path = 1;
+}
+
+message VolumeWriteFileResponse {
+  string path = 1;
+  bytes  body = 2;
+}
+
+service  Volume {
+  rpc WriteFile(VolumeWriteFileRequest) returns (VolumeWriteFileResponse) {}
+}
