@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+message DirectoryWriteFileRequest {
+  string path = 1;
+}
+
+message DirectoryWriteFileResponse {
+  string path = 1;
+  bytes  body = 2;
+}
+
+service  Directory {
+  rpc WriteFile(DirectoryWriteFileRequest) returns (DirectoryWriteFileResponse) {}
+}
