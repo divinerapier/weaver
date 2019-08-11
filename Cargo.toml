@@ -15,4 +15,15 @@ members = [
     "onyxia-directory",
     "onyxia-store",
     "onyxia-gateway",
+    "onyxia-proto",
 ]
+
+## example grpc server/client
+
+[[bin]]
+name = "example-client"
+path = "onyxia-proto/src/examples/client.rs"
+
+[[bin]]
+name = "example-server"
+path = "onyxia-proto/src/examples/server.rs"
