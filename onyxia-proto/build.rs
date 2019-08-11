@@ -1,11 +1,11 @@
 use std::env;
 
 fn main() {
-    // let out_dir = env::var("OUT_DIR").unwrap();
-    let out_dir = "src";
+    let out_dir = env::var("OUT_DIR").unwrap();
+    // let out_dir = "proto";
     let modules = &[
-        ("directory", "directory"),
-        ("volume", "volume"),
+        ("grpc/directory", "directory"),
+        ("grpc/volume", "volume"),
     ];
     for (dir, package) in modules {
         let out_dir = format!("{}/{}", out_dir, package);
