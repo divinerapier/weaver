@@ -4,9 +4,10 @@ use std::path::Path;
 use futures::stream::Stream;
 use futures::{Async, Poll};
 
+use crate::error::{Error, Result};
+
 pub struct FileStream {
     start: std::time::SystemTime,
-    batch_size: usize,
     index: usize,
     pub file: std::fs::File,
     pub buffer: Vec<u8>,
@@ -14,14 +15,13 @@ pub struct FileStream {
 }
 
 impl FileStream {
-    pub fn new<P: AsRef<Path>>(path: P) -> std::io::Result<FileStream> {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<FileStream> {
         let batch_size: usize = 4096000;
         let file = std::fs::File::open(path)?;
         let mut buffer = Vec::with_capacity(batch_size);
         buffer.resize(batch_size, 0);
         Ok(FileStream {
             start: std::time::SystemTime::now(),
-            batch_size,
             index: 0,
             file,
             buffer,
@@ -35,7 +35,6 @@ impl FileStream {
         buffer.resize(batch_size, 0);
         FileStream {
             start: std::time::SystemTime::now(),
-            batch_size,
             index: 0,
             file,
             buffer,
@@ -46,7 +45,7 @@ impl FileStream {
 
 impl Stream for FileStream {
     type Item = bytes::Bytes;
-    type Error = std::io::Error;
+    type Error = Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         let start = std::time::SystemTime::now();
