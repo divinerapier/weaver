@@ -20,4 +20,6 @@ fn main() {
             .collect();
         protobuf_build::generate_files(&["proto".to_owned()], &files, &out_dir);
     }
+    println!("rerun-if-changed=grpc" );
 }
+

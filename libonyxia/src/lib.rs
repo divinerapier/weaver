@@ -6,3 +6,4 @@ pub mod index;
 pub mod needle;
 pub mod utils;
 pub mod volume;
+pub mod file;
