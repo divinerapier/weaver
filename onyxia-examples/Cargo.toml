@@ -1,5 +1,5 @@
 [package]
-name = "example-client"
+name = "onyxia-example"
 version = "0.1.0"
 authors = ["divinerapier <poriter.coco@gmail.com>"]
 edition = "2018"
@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 # local protobuf
-onyxia-proto = {path = "../../onyxia-proto", version = "0.1.0"}
+onyxia-proto = {path = "../onyxia-proto", version = "0.1.0"}
 
 # required by examples
 env_logger = "0.6.2"
@@ -16,3 +16,13 @@ log = "0.4.8"
 grpcio-sys = { version = "0.5.0-alpha" }
 grpcio = {  features = ["secure"], version = "0.5.0-alpha.3", default-features = false }
 futures = "*"
+
+## example grpc server/client
+
+[[bin]]
+name = "example-client"
+path = "client/main.rs"
+
+[[bin]]
+name = "example-server"
+path = "server/main.rs"
