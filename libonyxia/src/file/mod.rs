@@ -50,7 +50,7 @@ impl Stream for FileStream {
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         let start = std::time::SystemTime::now();
         let size = self.file.read(&mut self.buffer)?;
-        println!(
+        log::debug!(
             "index: {}, read size: {}, start at {:?}, elapsed {:?}",
             self.index,
             size,
@@ -62,10 +62,10 @@ impl Stream for FileStream {
         }
         self.index += 1;
         if size == 0 {
-            println!("read elapsed {:?}", self.start.elapsed());
+            log::info!("read elapsed {:?}", self.start.elapsed());
             return Ok(Async::Ready(None));
         }
-        println!("poll elapsed {:?}", start.elapsed());
+        log::debug!("poll elapsed {:?}", start.elapsed());
         Ok(Async::Ready(Some(bytes::Bytes::from(
             self.buffer[0..size].to_vec(),
         ))))

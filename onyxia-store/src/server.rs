@@ -1,3 +1,4 @@
+use futures::future::Future;
 use futures::sink::Sink;
 use futures::stream::Stream;
 
@@ -20,16 +21,33 @@ impl volume_grpc::Volume for VolumeService {
         req: volume::ReadFileRequest,
         sink: ::grpcio::ServerStreamingSink<volume::ReadFileResponse>,
     ) {
-        // let f = std::fs::OpenOptions::new()
-        //     .read(true)
-        //     .open("/data/2.txt")
-        //     .unwrap();
-        // let file_stream = libonyxia::file::FileStream::from_std_file(f);
-        // let s = file_stream.map(|chunk| {
-        //     (volume::ReadFileResponse::default(), grpcio::WriteFlags::default())
-        // }).map_err(|e| {
-        //     grpcio::Error::Codec(Box::new(e))
-        // });
-        // sink.send_all(s);
+        let path = String::from(req.get_path());
+        let f = std::fs::OpenOptions::new()
+            .read(true)
+            .open(path.to_string())
+            .unwrap();
+        let file_stream = libonyxia::file::FileStream::from_std_file(f);
+        let mut offset = 0;
+        let s = file_stream.map(move |chunk| {
+            let chunk: bytes::Bytes = chunk;
+            let mut resp = volume::ReadFileResponse::new();
+            resp.set_length(chunk.len() as i64);
+            resp.set_offset(offset);
+            let mut status = volume::CommonStatus::default();
+            status.set_status_code(200);
+            resp.set_status(status);
+            resp.set_path(path.to_string());
+            resp.set_data(chunk.as_ref().to_owned());
+            offset += chunk.len() as i64;
+            (resp, grpcio::WriteFlags::default())
+        });
+        // Spawn executes futures of which Item and Error both should
+        // be empty tuple. So we must call map and map_err with empty
+        // tuple returned.
+        let f = sink
+            .send_all(s)
+            .map(|_| {})
+            .map_err(|e| log::error!("failed to send response. error: {}", e));
+        ctx.spawn(f);
     }
 }

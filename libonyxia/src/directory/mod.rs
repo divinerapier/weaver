@@ -1,12 +1,12 @@
-use crate::error::{self, Error, Result};
-use crate::needle::Needle;
-use crate::utils::size::Size;
-use crate::volume::Volume;
-
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::ops::Try;
 use std::path::{Path, PathBuf};
+
+use crate::error::{self, Error, Result};
+use crate::needle::Needle;
+use crate::utils::size::Size;
+use crate::volume::Volume;
 
 #[allow(dead_code)]
 pub struct Directory {
@@ -73,7 +73,6 @@ impl Directory {
     where
         K: Into<String> + Clone + Display,
     {
-        // TODO: retry on failure. eg: add a error type: RetriableError(Box<Error>)
         let mut retry_times = 3;
         while let Err(volume_error) = self.try_write(path.clone(), &body) {
             log::error!(
