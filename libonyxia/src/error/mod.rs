@@ -1,8 +1,6 @@
 use std::io;
 use std::sync::mpsc;
 
-use failure::Fail;
-
 mod directory_error;
 mod index_error;
 mod volume_error;
@@ -11,54 +9,86 @@ pub use directory_error::DirectoryError;
 pub use index_error::IndexError;
 pub use volume_error::VolumeError;
 
-#[derive(Debug, Fail)]
 pub enum Error {
-    #[fail(display = "IO. {}", _0)]
-    IO(#[fail(cause)] io::Error),
-
-    #[fail(display = "Channel. {}", _0)]
+    IO(io::Error),
     Channel(String),
-
-    #[fail(display = "Data corruption. key: {}, cause: {}", key, cause)]
-    DataCorruption { key: String, cause: String },
-
-    #[fail(display = "Not found. {}", _0)]
+    DataCorruption {
+        key: String,
+        cause: String,
+    },
     NotFound(String),
-
-    #[fail(display = "Open volume")]
     OpenVolume,
-
-    #[fail(display = "Path. {}", _0)]
     Path(String),
-
-    #[fail(display = "Parse. from: {}  to: {}  cause: {}", from, to, cause)]
     Parse {
         from: String,
         to: String,
         cause: String,
     },
-
-    #[fail(display = "JSON. {}", _0)]
     SerdeJSON(serde_json::error::Error),
-
-    #[fail(display = "Error. {}", _0)]
     Naive(String),
-
-    #[fail(display = "File exists. {}", _0)]
     FileExists(String),
-
-    #[fail(display = "Volume {}", _0)]
     Volume(VolumeError),
-
-    #[fail(display = "Directory {}", _0)]
     Directory(DirectoryError),
-
-    #[fail(display = "Index {}", _0)]
     Index(IndexError),
-
-    #[fail(display = "Retriable {}", _0)]
     Retriable(Box<Error>),
 }
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Error::*;
+        match self {
+            IO(e) => write!(f, "IO. {}", e),
+            Channel(e) => write!(f, "Channel. {}", e),
+            DataCorruption { key, cause } => {
+                write!(f, "DataCorruption. key: {}, cause: {}", key, cause)
+            }
+            NotFound(e) => write!(f, "NotFound. {}", e),
+            OpenVolume => write!(f, "OpenVolume"),
+            Path(e) => write!(f, "Path. {}", e),
+            Parse { from, to, cause } => {
+                write!(f, "Parse. from: {}  to: {}  cause: {}", from, to, cause)
+            }
+            SerdeJSON(e) => write!(f, "JSON. {}", e),
+            Naive(e) => write!(f, "Error. {}", e),
+            FileExists(e) => write!(f, "File exists. {}", e),
+            Volume(e) => write!(f, "Volume. {}", e),
+            Directory(e) => write!(f, "Directory. {}", e),
+            Index(e) => write!(f, "Index. {}", e),
+            Retriable(e) => write!(f, "Retriable. {}", e),
+        }
+    }
+}
+
+impl std::fmt::Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Error::*;
+        match self {
+            IO(e) => write!(f, "IO. {}", e),
+            Channel(e) => write!(f, "Channel. {}", e),
+            DataCorruption { key, cause } => {
+                write!(f, "DataCorruption. key: {}, cause: {}", key, cause)
+            }
+            NotFound(e) => write!(f, "NotFound. {}", e),
+            OpenVolume => write!(f, "OpenVolume"),
+            Path(e) => write!(f, "Path. {}", e),
+            Parse { from, to, cause } => {
+                write!(f, "Parse. from: {}  to: {}  cause: {}", from, to, cause)
+            }
+            SerdeJSON(e) => write!(f, "JSON. {}", e),
+            Naive(e) => write!(f, "Error. {}", e),
+            FileExists(e) => write!(f, "File exists. {}", e),
+            Volume(e) => write!(f, "Volume. {}", e),
+            Directory(e) => write!(f, "Directory. {}", e),
+            Index(e) => write!(f, "Index. {}", e),
+            Retriable(e) => write!(f, "Retriable. {}", e),
+        }
+    }
+}
+
+unsafe impl Send for Error {}
+unsafe impl Sync for Error {}
+
+impl std::error::Error for Error {}
 
 impl Error {
     // constructor
@@ -175,5 +205,11 @@ impl From<String> for Box<Error> {
 impl From<mpsc::SendError<Result<bytes::Bytes>>> for Box<Error> {
     fn from(e: mpsc::SendError<Result<bytes::Bytes>>) -> Self {
         Error::Channel(format!("send bytes. {:?}", e)).into()
+    }
+}
+
+impl From<Error> for grpcio::Error {
+    fn from(e: Error) -> Self {
+        grpcio::Error::Codec(Box::new(e))
     }
 }

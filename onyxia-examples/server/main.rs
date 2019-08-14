@@ -1,7 +1,5 @@
 use std::io::Read;
 
-extern crate log;
-
 use futures::future::Future;
 
 use onyxia_proto::directory::directory;
