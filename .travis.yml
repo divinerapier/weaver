@@ -10,7 +10,7 @@ install:
   - true
 
 script: 
-  - cargo test --package libonyxia
+  - make test
 
 cache:
   - cargo

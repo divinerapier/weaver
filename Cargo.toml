@@ -14,19 +14,9 @@ members = [
     "onyxia-store",
     "onyxia-gateway",
     "onyxia-proto",
-    "onyxia-examples/client/",
-    "onyxia-examples/server/",
+    "onyxia-examples",
 ]
 
-## example grpc server/client
-
-[[bin]]
-name = "example-client"
-path = "onyxia-examples/client/main.rs"
-
-[[bin]]
-name = "example-server"
-path = "onyxia-examples/server/main.rs"
 
 # [features]
 # default = ["protobuf-codec", "secure"]

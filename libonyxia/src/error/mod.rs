@@ -143,6 +143,12 @@ impl Error {
 // Box the error in case of large data structure when there is no error.
 pub type Result<T> = std::result::Result<T, Box<Error>>;
 
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        Error::IO(e)
+    }
+}
+
 impl From<io::Error> for Box<Error> {
     fn from(e: io::Error) -> Self {
         Error::IO(e).into()

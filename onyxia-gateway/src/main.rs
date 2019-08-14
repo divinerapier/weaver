@@ -7,8 +7,6 @@ use actix_web::{error, middleware, web, App, Error, HttpRequest, HttpResponse, H
 use futures::future::{err, Either};
 use futures::{Future, Stream};
 
-mod file;
-
 pub struct AppState {
     pub counter: Cell<usize>,
 }
@@ -86,7 +84,7 @@ pub fn download(req: HttpRequest) -> HttpResponse {
                 HttpResponse::InternalServerError().body(message)
             }
         },
-        Ok(f) => HttpResponse::Ok().streaming(file::FileStream::from_std_file(f)),
+        Ok(f) => HttpResponse::Ok().streaming(libonyxia::file::FileStream::from_std_file(f)),
     }
 }
 
