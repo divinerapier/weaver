@@ -4,6 +4,7 @@ use futures::future::Future;
 
 use onyxia_proto::volume::volume_grpc;
 
+mod client;
 mod server;
 
 fn main() {
@@ -11,6 +12,7 @@ fn main() {
     log::set_max_level(log::LevelFilter::max());
     let env = std::sync::Arc::new(grpcio::Environment::new(1));
     let service = volume_grpc::create_volume(server::VolumeService);
+    // TODO: use clap to handle commands
     let mut server = grpcio::ServerBuilder::new(env)
         .register_service(service)
         .bind("127.0.0.1", 50_051)
@@ -28,4 +30,13 @@ fn main() {
     });
     let _ = rx.wait();
     let _ = server.shutdown().wait();
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_read_file() {
+        let client = super::client::VolumeClient::new(":50051");
+        client.download_file("/data/1.txt".to_string(), "/data/2.txt".to_string());
+    }
 }

@@ -15,7 +15,8 @@ grpcio-sys = { version = "0.5.0-alpha" }
 grpcio = {  features = ["secure"], version = "0.5.0-alpha.3", default-features = false }
 futures = "*"
 
-# required by examples
+# required by service
 env_logger = "0.6.2"
 log = "0.4.8"
 libonyxia = {path = "../libonyxia/", version = "0.1.0"}
+bytes = "0.4.12"
