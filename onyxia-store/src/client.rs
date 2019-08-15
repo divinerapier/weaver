@@ -3,23 +3,23 @@ use std::io::Write;
 use futures::future::Future;
 use futures::stream::Stream;
 
-use onyxia_proto::volume::volume;
-use onyxia_proto::volume::volume_grpc;
+use onyxia_proto::store::store;
+use onyxia_proto::store::store_grpc;
 
-pub struct VolumeClient {
-    client: volume_grpc::VolumeClient,
+pub struct StoreClient {
+    client: store_grpc::StoreClient,
 }
 
-impl VolumeClient {
-    pub fn new(addr: &str) -> VolumeClient {
+impl StoreClient {
+    pub fn new(addr: &str) -> StoreClient {
         let env = std::sync::Arc::new(grpcio::EnvBuilder::new().build());
         let ch = grpcio::ChannelBuilder::new(env).connect("localhost:50051");
-        let client = volume_grpc::VolumeClient::new(ch);
-        VolumeClient { client }
+        let client = store_grpc::StoreClient::new(ch);
+        StoreClient { client }
     }
 
     pub fn download_file(&self, req_path: String, output_path: String) {
-        let mut req = volume::ReadFileRequest::default();
+        let mut req = store::ReadFileRequest::default();
         req.set_path(req_path);
         let mut output_file = std::fs::OpenOptions::new()
             .read(true)
@@ -35,7 +35,7 @@ impl VolumeClient {
             match fu.wait() {
                 Ok((Some(resp), s)) => {
                     reply = s;
-                    let resp: volume::ReadFileResponse = resp;
+                    let resp: store::ReadFileResponse = resp;
                     let data = resp.get_data();
                     output_file.write_all(data).unwrap();
                 }

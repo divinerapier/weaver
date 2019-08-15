@@ -2,24 +2,24 @@ use futures::future::Future;
 use futures::sink::Sink;
 use futures::stream::Stream;
 
-use onyxia_proto::volume::*;
+use onyxia_proto::store::*;
 
 #[derive(Clone, Copy)] // clone trait required by `fn create_directory`
-pub struct VolumeService;
+pub struct StoreService;
 
-impl volume_grpc::Volume for VolumeService {
+impl store_grpc::Store for StoreService {
     fn write_file(
         &mut self,
         ctx: ::grpcio::RpcContext,
-        stream: ::grpcio::RequestStream<volume::WriteFileRequest>,
-        sink: ::grpcio::ClientStreamingSink<volume::WriteFileResponse>,
+        stream: ::grpcio::RequestStream<store::WriteFileRequest>,
+        sink: ::grpcio::ClientStreamingSink<store::WriteFileResponse>,
     ) {
     }
     fn read_file(
         &mut self,
         ctx: ::grpcio::RpcContext,
-        req: volume::ReadFileRequest,
-        sink: ::grpcio::ServerStreamingSink<volume::ReadFileResponse>,
+        req: store::ReadFileRequest,
+        sink: ::grpcio::ServerStreamingSink<store::ReadFileResponse>,
     ) {
         let path = String::from(req.get_path());
         let f = std::fs::OpenOptions::new()
@@ -30,10 +30,10 @@ impl volume_grpc::Volume for VolumeService {
         let mut offset = 0;
         let s = file_stream.map(move |chunk| {
             let chunk: bytes::Bytes = chunk;
-            let mut resp = volume::ReadFileResponse::new();
+            let mut resp = store::ReadFileResponse::new();
             resp.set_length(chunk.len() as i64);
             resp.set_offset(offset);
-            let mut status = volume::CommonStatus::default();
+            let mut status = store::CommonStatus::default();
             status.set_status_code(200);
             resp.set_status(status);
             resp.set_path(path.to_string());
