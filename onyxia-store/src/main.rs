@@ -2,7 +2,7 @@ use std::io::Read;
 
 use futures::future::Future;
 
-use onyxia_proto::volume::volume_grpc;
+use onyxia_proto::store::store_grpc;
 
 mod client;
 mod server;
@@ -11,7 +11,7 @@ fn main() {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     log::set_max_level(log::LevelFilter::max());
     let env = std::sync::Arc::new(grpcio::Environment::new(1));
-    let service = volume_grpc::create_volume(server::VolumeService);
+    let service = store_grpc::create_store(server::StoreService);
     // TODO: use clap to handle commands
     let mut server = grpcio::ServerBuilder::new(env)
         .register_service(service)
@@ -36,7 +36,7 @@ fn main() {
 mod test {
     #[test]
     fn test_read_file() {
-        let client = super::client::VolumeClient::new(":50051");
+        let client = super::client::StoreClient::new(":50051");
         client.download_file("/data/1.txt".to_string(), "/data/2.txt".to_string());
     }
 }

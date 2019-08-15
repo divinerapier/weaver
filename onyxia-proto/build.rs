@@ -3,7 +3,7 @@ fn main() {
     let out_dir = "src";
     let modules = &[
         ("grpc/directory", "directory"),
-        ("grpc/volume", "volume"),
+        ("grpc/store", "store"),
     ];
     for (dir, package) in modules {
         let out_dir = format!("{}/{}", out_dir, package);
@@ -20,5 +20,7 @@ fn main() {
             .collect();
         protobuf_build::generate_files(&["proto".to_owned()], &files, &out_dir);
     }
-    println!("rerun-if-changed=grpc");
+    println!("rerun-if-changed=build.rs");
+    println!("rerun-if-changed=proto/grpc/directory/directory.proto");
+    println!("rerun-if-changed=proto/grpc/store/store.proto");
 }
