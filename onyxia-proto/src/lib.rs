@@ -4,4 +4,4 @@
 #[allow(renamed_and_removed_lints)]
 #[allow(bare_trait_objects)]
 pub mod directory;
-pub mod volume;
+pub mod store;

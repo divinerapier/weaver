@@ -34,7 +34,7 @@ message CommonStatus {
   
   // rpc services
   
-  service Volume {
+  service Store {
     rpc WriteFile(stream WriteFileRequest) returns (WriteFileResponse) {};
     rpc ReadFile(ReadFileRequest) returns (stream ReadFileResponse) {};
   }
