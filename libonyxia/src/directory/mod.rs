@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{self, Error, Result};
 use crate::needle::Needle;
+use crate::store::volume::Volume;
 use crate::utils::size::Size;
-use crate::volume::Volume;
 
 #[allow(dead_code)]
 pub struct Directory {
