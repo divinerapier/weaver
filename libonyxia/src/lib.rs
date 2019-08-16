@@ -6,4 +6,4 @@ pub mod file;
 pub mod index;
 pub mod needle;
 pub mod utils;
-pub mod volume;
+pub mod store;

@@ -10,7 +10,7 @@ fn main() {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     log::set_max_level(log::LevelFilter::max());
     let env = std::sync::Arc::new(grpcio::Environment::new(1));
-    let service = directory_grpc::create_directory(server::DirectoryService);
+    let service = directory_grpc::create_directory(server::DirectoryService {});
     let mut server = grpcio::ServerBuilder::new(env)
         .register_service(service)
         .bind("127.0.0.1", 50_051)

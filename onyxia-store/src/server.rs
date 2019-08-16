@@ -1,11 +1,25 @@
+use std::sync::Arc;
+
+use libonyxia::store::Store;
+use onyxia_proto::store::*;
+
 use futures::future::Future;
 use futures::sink::Sink;
 use futures::stream::Stream;
 
-use onyxia_proto::store::*;
+// clone trait required by `fn create_directory`, so inner fields must be arc
+#[derive(Clone)]
+pub struct StoreService {
+    storage: Arc<Store>,
+}
 
-#[derive(Clone, Copy)] // clone trait required by `fn create_directory`
-pub struct StoreService;
+impl StoreService {
+    pub fn new(dir: &str) -> StoreService {
+        StoreService {
+            storage: Arc::new(Store::new(dir).unwrap()),
+        }
+    }
+}
 
 impl store_grpc::Store for StoreService {
     fn write_file(
