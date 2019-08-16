@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{self, Error, Result};
 use crate::needle::Needle;
+use crate::store::volume::Volume;
 use crate::utils::size::Size;
-use crate::volume::Volume;
 
 #[allow(dead_code)]
 pub struct Directory {
@@ -73,33 +73,20 @@ impl Directory {
     where
         K: Into<String> + Clone + Display,
     {
-        let mut retry_times = 3;
-        while let Err(volume_error) = self.try_write(path.clone(), &body) {
-            log::error!(
-                "directory try write. path: {}, error: {}",
-                path,
-                volume_error
-            );
-            if volume_error.is_retriable() && retry_times > 0 {
-                retry_times -= 1;
-                continue;
-            }
-            return Err(volume_error);
-        }
-        Ok(())
+        self.try_write(path.clone(), body)
     }
 
-    fn try_write<K>(&mut self, path: K, body: &Needle) -> Result<()>
+    fn try_write<K>(&mut self, path: K, body: Needle) -> Result<()>
     where
         K: Into<String>,
     {
-        let mut volume_id = self.get_writable_volume(body.length)?;
+        let mut volume_id = self.get_writable_volume(body.total_length() as usize)?;
         let volume: &mut Volume = self
             .volumes
             .get_mut(volume_id)
             .ok_or(Error::volume(error::VolumeError::not_found(volume_id)))?;
         let path = path.into();
-        volume.write_needle(&path, &body)?;
+        volume.write_needle(&path, body)?;
         self.needle_map.insert(path.clone(), volume.id);
         if !volume.writable() {
             self.writable_volumes.remove(&volume_id);
@@ -212,14 +199,16 @@ impl Default for Directory {
 mod test {
     use super::*;
     use crate::needle::NeedleBody;
+    use crate::needle::NeedleHeader;
     use std::env;
 
     #[test]
     fn foo1() {
-        env_logger::init();
-        log::log_enabled!(log::Level::Trace);
+        env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
+        log::set_max_level(log::LevelFilter::max());
         let testdata_dir = env::current_dir().unwrap().join("testdata");
-        // std::fs::remove_dir_all(testdata_dir.as_path());
+        std::fs::create_dir_all(testdata_dir.as_path()).unwrap();
+        std::fs::remove_dir_all(testdata_dir.as_path()).unwrap();
         std::fs::create_dir_all(testdata_dir.as_path()).unwrap();
         let mut directory = Directory::new(testdata_dir.as_path(), Size::byte(100)).unwrap();
         let data1 = bytes::Bytes::from("data1: hello world data1\n");
@@ -236,7 +225,9 @@ mod test {
             {
                 log::debug!("test1",);
                 let needle = Needle {
-                    length: data1.len(),
+                    header: NeedleHeader {
+                        body_length: data1.len() as u32,
+                    },
                     body: NeedleBody::SinglePart(data1),
                 };
                 directory.write("/path/to/file/1", needle).unwrap();
@@ -244,7 +235,9 @@ mod test {
             {
                 log::debug!("test2",);
                 let needle = Needle {
-                    length: data2.len(),
+                    header: NeedleHeader {
+                        body_length: data2.len() as u32,
+                    },
                     body: NeedleBody::SinglePart(data2),
                 };
                 directory.write("/path/to/file/2", needle).unwrap();
@@ -252,7 +245,9 @@ mod test {
             {
                 log::debug!("test3",);
                 let needle = Needle {
-                    length: data3.len(),
+                    header: NeedleHeader {
+                        body_length: data3.len() as u32,
+                    },
                     body: NeedleBody::SinglePart(data3),
                 };
                 directory.write("/path/to/file/3", needle).unwrap();
@@ -260,7 +255,9 @@ mod test {
             {
                 log::debug!("test4",);
                 let needle = Needle {
-                    length: data4.len(),
+                    header: NeedleHeader {
+                        body_length: data4.len() as u32,
+                    },
                     body: NeedleBody::SinglePart(data4),
                 };
                 directory.write("/path/to/file/4", needle).unwrap();
@@ -268,7 +265,9 @@ mod test {
             {
                 log::debug!("test5",);
                 let needle = Needle {
-                    length: data5.len(),
+                    header: NeedleHeader {
+                        body_length: data5.len() as u32,
+                    },
                     body: NeedleBody::SinglePart(data5),
                 };
                 directory.write("/path/to/file/5", needle).unwrap();
@@ -276,7 +275,9 @@ mod test {
             {
                 log::debug!("test6",);
                 let needle = Needle {
-                    length: data6.len(),
+                    header: NeedleHeader {
+                        body_length: data6.len() as u32,
+                    },
                     body: NeedleBody::SinglePart(data6),
                 };
                 directory.write("/path/to/file/6", needle).unwrap();
@@ -291,10 +292,11 @@ mod test {
                     tx.send(Ok(data7_3)).unwrap();
                 });
                 let needle = Needle {
-                    length,
+                    header: NeedleHeader {
+                        body_length: length as u32,
+                    },
                     body: NeedleBody::MultiParts(rx),
                 };
-                println!("write test7",);
                 directory.write("/path/to/file/7", needle).unwrap();
             }
         }
@@ -318,14 +320,14 @@ mod test {
     }
 
     fn check_needle_body(needle: Needle, data: &str) {
-        assert_eq!(needle.length, data.len());
+        assert_eq!(needle.body_length() as usize, data.len());
         match needle.body {
             NeedleBody::SinglePart(body) => {
                 assert_eq!(body.len(), data.len());
                 assert_eq!(body.as_ref(), data.as_bytes());
             }
             // TODO: test read multiparts
-            NeedleBody::MultiParts(body_chain) => {}
+            NeedleBody::MultiParts(_body_chain) => {}
         }
     }
 

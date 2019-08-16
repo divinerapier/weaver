@@ -213,3 +213,5 @@ impl From<Error> for grpcio::Error {
         grpcio::Error::Codec(Box::new(e))
     }
 }
+
+impl actix_http::error::ResponseError for Error {}

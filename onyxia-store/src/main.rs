@@ -1,4 +1,5 @@
 use std::io::Read;
+use std::sync::Arc;
 
 use futures::future::Future;
 
@@ -11,7 +12,7 @@ fn main() {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     log::set_max_level(log::LevelFilter::max());
     let env = std::sync::Arc::new(grpcio::Environment::new(1));
-    let service = store_grpc::create_store(server::StoreService);
+    let service = store_grpc::create_store(server::StoreService::new("/data/onyxia"));
     // TODO: use clap to handle commands
     let mut server = grpcio::ServerBuilder::new(env)
         .register_service(service)

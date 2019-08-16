@@ -1,6 +1,6 @@
 use crate::error::{self, Error, Result};
 use crate::index::{Index, RawIndex};
-use crate::needle::{Needle, NeedleBody};
+use crate::needle::{Needle, NeedleBody, NeedleHeader};
 use crate::utils::{self, size::Size};
 
 use std::collections::HashMap;
@@ -41,7 +41,7 @@ impl From<&OsStr> for VolumeExtension {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Volume {
     pub id: usize,
     pub volume_path: String,
@@ -54,6 +54,12 @@ pub struct Volume {
     #[serde(skip_serializing)]
     pub index_file: File,
     pub indexes: HashMap<String, RawIndex>,
+}
+
+impl Display for Volume {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
 }
 
 impl Volume {
@@ -225,13 +231,14 @@ impl Volume {
             .create_new(new)
             .truncate(false)
             .append(true)
-            .open(filepath)?;
+            .open(filepath.as_ref())?;
 
         let mut index_map = HashMap::new();
 
         if new {
             return Ok((index_file, index_map, RawIndex::default()));
         }
+        let volume_id: usize = Self::parse_volume_file_stem_name(filepath.as_ref())?;
         let mut readonly_index_file = index_file.try_clone()?;
         readonly_index_file.seek(SeekFrom::Start(0))?;
         let reader = std::io::BufReader::new(readonly_index_file);
@@ -239,7 +246,7 @@ impl Volume {
         let mut last_index = RawIndex::default();
         for index_result in indexes_reader {
             let index: Index = index_result?;
-            let raw_index = RawIndex::new(index.offset, index.length);
+            let raw_index = RawIndex::new(volume_id, index.offset, index.length);
             last_index = raw_index;
             index_map.insert(index.path, raw_index);
         }
@@ -255,8 +262,8 @@ impl Volume {
         return length_after_write <= self.max_length;
     }
 
-    pub fn write_needle(&mut self, path: &str, needle: &Needle) -> Result<()> {
-        let length = needle.length;
+    pub fn write_needle(&mut self, path: &str, needle: Needle) -> Result<()> {
+        let length = needle.total_length() as usize;
         if !self.can_write(length as u64) {
             log::error!(
                 "couldn't write to the volume. id: {}, path: {}, writable: {}, max_length: {}, current_length: {}, todo: {}",
@@ -265,49 +272,27 @@ impl Volume {
                 self.writable(),
                 self.max_length,
                 self.current_length,
-                needle.length
+               length
             );
-            return Err(Error::retry(Error::volume(error::VolumeError::overflow(
+            return Err(Error::volume(error::VolumeError::overflow(
                 self.id,
                 self.max_length,
                 self.current_length,
                 length as u64,
-            ))));
+            )));
         }
         let mut received_length = 0usize;
-        self.writable_volume
-            .seek(SeekFrom::Start(self.current_length))?;
+        let mut writable_volume = self.writable_volume.try_clone()?;
+        writable_volume.seek(SeekFrom::Start(self.current_length))?;
 
-        let mut writer = BufWriter::new(self.writable_volume.try_clone()?);
-        let mut wrote = 0;
-        match &needle.body {
-            NeedleBody::SinglePart(data) => {
-                received_length += data.len();
-                writer.write_all(data.as_ref())?;
-            }
-            NeedleBody::MultiParts(receiver) => {
-                for data in receiver.iter() {
-                    match data {
-                        Ok(data) => {
-                            received_length += data.len();
-                            writer.write_all(data.as_ref())?;
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "failed to receive multiparts body. path: {}, error: {}",
-                                path,
-                                e
-                            );
-                            return Err(Error::volume(error::VolumeError::write_needle(
-                                path,
-                                format!("{:?}", e),
-                            )));
-                        }
-                    }
-                    wrote += 1;
-                    log::debug!("wrote multiparts. {}", wrote);
-                }
-            }
+        let mut writer = BufWriter::new(writable_volume);
+
+        let needle_iter = needle.into_iter();
+        for data in needle_iter {
+            let data = data?;
+            log::debug!("data: {:?}", data);
+            received_length += data.len();
+            writer.write_all(data.as_ref())?;
         }
 
         if received_length != length {
@@ -327,12 +312,19 @@ impl Volume {
         // write index
         // TODO: supports write-ahead log
 
-        let index = Index::new(path.to_owned(), self.current_length as usize, length);
+        let index = Index::new(
+            path.to_owned(),
+            self.id,
+            self.current_length as usize,
+            length,
+        );
         self.index_file
             .write_all(serde_json::to_string(&index)?.as_bytes())?;
         self.current_length += length as u64;
-        self.indexes
-            .insert(path.to_owned(), RawIndex::new(index.offset, index.length));
+        self.indexes.insert(
+            path.to_owned(),
+            RawIndex::new(index.volume_id, index.offset, index.length),
+        );
         Ok(())
     }
 
@@ -359,65 +351,85 @@ impl Volume {
             );
             return Err(Error::data_corruption(path, "index out of current length"));
         }
-        let body = self.read_needle(&index)?;
-        Ok(Needle {
-            body: body,
-            length: index.length,
-        })
+        Ok(self.read_needle(&index)?)
     }
 
-    pub fn read_needle(&self, index: &RawIndex) -> Result<NeedleBody> {
+    pub fn read_needle_header(file: &mut File, offset: usize) -> Result<NeedleHeader> {
+        let mut buffer = Vec::with_capacity(4);
+        buffer.resize(4, 0 as u8);
+        file.seek(std::io::SeekFrom::Start(offset as u64))?;
+        file.read_exact(&mut buffer)?;
+        // automatically provides the implementation of [`Into`]
+        Ok(buffer.into())
+    }
+
+    pub fn read_needle_body() {}
+
+    pub fn read_needle(&self, index: &RawIndex) -> Result<Needle> {
         let mut readonly_volume = self.readonly_volume.try_clone()?;
-        readonly_volume.seek(std::io::SeekFrom::Start(index.offset as u64))?;
-        let batch_size = if index.length > 1024 * 1024 {
+        let needle_header = Self::read_needle_header(&mut readonly_volume, index.offset)?;
+        if needle_header.body_length as usize != index.length - 4 {
+            log::error!(
+                "length from index: {}, length from needle header: {}",
+                index.length,
+                needle_header.body_length
+            );
+        }
+        let batch_size = if needle_header.body_length > 1024 * 1024 {
             1024 * 1024 // 1M
         } else {
-            index.length
+            needle_header.body_length as usize
         };
+        readonly_volume.seek(std::io::SeekFrom::Start(index.offset as u64 + 4))?;
         let mut buffer = Vec::with_capacity(batch_size);
         buffer.resize(batch_size, 0 as u8);
         let mut readonly_volume = self.readonly_volume.try_clone()?;
         if index.length <= 1024 * 1024 {
             readonly_volume.read_exact(&mut buffer)?;
-            Ok(NeedleBody::SinglePart(bytes::Bytes::from(buffer)))
-        } else {
-            // TODO: using thread pool
-            let (tx, rx) = std::sync::mpsc::sync_channel(1);
-            let mut remains = index.length;
-            std::thread::spawn(move || {
-                while remains > 0 {
-                    let current = match readonly_volume.read(&mut buffer) {
-                        Ok(current) => current,
-                        Err(e) => {
-                            // NOTE: This function will never panic, but it may return [`Err`]
-                            // if the [`Receiver`] has disconnected and is no longer able to
-                            // receive information.
-                            match tx.send(Err(Error::io(e))) {
-                                Ok(_) => {}
-                                Err(send_error) => {
-                                    println!("failed to send error into channel. {:?}", send_error);
-                                }
+            return Ok(Needle {
+                header: needle_header,
+                body: NeedleBody::SinglePart(bytes::Bytes::from(buffer)),
+            });
+        }
+        // TODO: using thread pool
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        let mut remains = index.length;
+        std::thread::spawn(move || {
+            while remains > 0 {
+                let current = match readonly_volume.read(&mut buffer) {
+                    Ok(current) => current,
+                    Err(e) => {
+                        // NOTE: This function will never panic, but it may return [`Err`]
+                        // if the [`Receiver`] has disconnected and is no longer able to
+                        // receive information.
+                        match tx.send(Err(Error::io(e))) {
+                            Ok(_) => {}
+                            Err(send_error) => {
+                                println!("failed to send error into channel. {:?}", send_error);
                             }
-                            return;
                         }
-                    };
-                    remains -= current;
-                    match tx.send(Ok(bytes::Bytes::from(&buffer[0..current]))) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            match tx.send(Err(Error::channel(e.description()))) {
-                                Ok(_) => {}
-                                Err(send_error) => {
-                                    println!("failed to send error into channel. {:?}", send_error);
-                                }
+                        return;
+                    }
+                };
+                remains -= current;
+                match tx.send(Ok(bytes::Bytes::from(&buffer[0..current]))) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        match tx.send(Err(Error::channel(e.description()))) {
+                            Ok(_) => {}
+                            Err(send_error) => {
+                                println!("failed to send error into channel. {:?}", send_error);
                             }
-                            return;
                         }
+                        return;
                     }
                 }
-            });
-            Ok(NeedleBody::MultiParts(rx))
-        }
+            }
+        });
+        Ok(Needle {
+            header: needle_header,
+            body: NeedleBody::MultiParts(rx),
+        })
     }
 }
 
@@ -434,9 +446,9 @@ mod test {
         let mut file: File = tempfile::tempfile().unwrap();
 
         let indexes: Vec<Index> = vec![
-            Index::new("/tmp/file1".to_owned(), 0, 10),
-            Index::new("/tmp/file2".to_owned(), 10, 20),
-            Index::new("/tmp/file3".to_owned(), 20, 30),
+            Index::new("/tmp/file1".to_owned(), 1, 0, 10),
+            Index::new("/tmp/file2".to_owned(), 1, 10, 20),
+            Index::new("/tmp/file3".to_owned(), 1, 20, 30),
         ];
 
         for index in &indexes {
