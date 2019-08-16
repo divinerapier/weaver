@@ -12,15 +12,11 @@ pub struct AppState {
 }
 
 pub fn save_file(field: Field, filepath: &str) -> impl Future<Item = i64, Error = Error> {
-    println!("disposition: {:?}", field.content_disposition());
-    println!("content_type: {:?}", field.content_type());
-    println!("headers: {:?}", field.headers());
-
     let current_dir = std::env::current_dir().unwrap();
     let file_path_string = current_dir.join(filepath);
-    println!("upload file to path: {:?}", file_path_string);
+    log::info!("upload file to path: {:?}", file_path_string);
     let parent = file_path_string.parent().unwrap();
-    std::fs::create_dir_all(parent);
+    std::fs::create_dir_all(parent).unwrap();
     let file = match fs::File::create(file_path_string) {
         Ok(file) => file,
         Err(e) => return Either::A(err(error::ErrorInternalServerError(e))),
@@ -32,7 +28,7 @@ pub fn save_file(field: Field, filepath: &str) -> impl Future<Item = i64, Error 
                 // on threadpool
                 web::block(move || {
                     file.write_all(bytes.as_ref()).map_err(|e| {
-                        println!("file.write_all failed: {:?}", e);
+                        log::info!("file.write_all failed: {:?}", e);
                         MultipartError::Payload(error::PayloadError::Io(e))
                     })?;
                     acc += bytes.len() as i64;
@@ -45,7 +41,7 @@ pub fn save_file(field: Field, filepath: &str) -> impl Future<Item = i64, Error 
             })
             .map(|(_, acc)| acc)
             .map_err(|e| {
-                println!("save_file failed, {:?}", e);
+                log::error!("save_file failed, {:?}", e);
                 error::ErrorInternalServerError(e)
             }),
     )
@@ -57,9 +53,8 @@ pub fn upload(
     counter: web::Data<Cell<usize>>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     counter.set(counter.get() + 1);
-    println!("{:?}", counter.get());
     let path = req.match_info().get("path").unwrap().to_owned();
-    println!("path: {}", path);
+    log::info!("path: {}", path);
 
     multipart
         .map_err(error::ErrorInternalServerError)
@@ -68,7 +63,7 @@ pub fn upload(
         .collect()
         .map(|sizes| HttpResponse::Ok().json(sizes))
         .map_err(|e| {
-            println!("failed: {}", e);
+            log::error!("multipart upload: {}", e);
             e
         })
 }
@@ -113,7 +108,8 @@ fn index() -> HttpResponse {
 
 fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_server=info,actix_web=info");
-    env_logger::init();
+    env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
+    log::set_max_level(log::LevelFilter::max());
 
     HttpServer::new(|| {
         App::new()

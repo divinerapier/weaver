@@ -18,3 +18,4 @@ rand = "0.7.0"
 rand_core = "*"
 futures = "0.1.28"
 grpcio = {  features = ["secure"], version = "0.5.0-alpha.3", default-features = false }
+actix-http = "0.2.8"

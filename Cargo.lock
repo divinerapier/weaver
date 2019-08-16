@@ -914,6 +914,7 @@ dependencies = [
 name = "libonyxia"
 version = "0.1.0"
 dependencies = [
+ "actix-http 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",

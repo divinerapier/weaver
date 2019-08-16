@@ -225,13 +225,14 @@ impl Volume {
             .create_new(new)
             .truncate(false)
             .append(true)
-            .open(filepath)?;
+            .open(filepath.as_ref())?;
 
         let mut index_map = HashMap::new();
 
         if new {
             return Ok((index_file, index_map, RawIndex::default()));
         }
+        let volume_id: usize = Self::parse_volume_file_stem_name(filepath.as_ref())?;
         let mut readonly_index_file = index_file.try_clone()?;
         readonly_index_file.seek(SeekFrom::Start(0))?;
         let reader = std::io::BufReader::new(readonly_index_file);
@@ -239,7 +240,7 @@ impl Volume {
         let mut last_index = RawIndex::default();
         for index_result in indexes_reader {
             let index: Index = index_result?;
-            let raw_index = RawIndex::new(index.offset, index.length);
+            let raw_index = RawIndex::new(volume_id, index.offset, index.length);
             last_index = raw_index;
             index_map.insert(index.path, raw_index);
         }
@@ -327,12 +328,19 @@ impl Volume {
         // write index
         // TODO: supports write-ahead log
 
-        let index = Index::new(path.to_owned(), self.current_length as usize, length);
+        let index = Index::new(
+            path.to_owned(),
+            self.id,
+            self.current_length as usize,
+            length,
+        );
         self.index_file
             .write_all(serde_json::to_string(&index)?.as_bytes())?;
         self.current_length += length as u64;
-        self.indexes
-            .insert(path.to_owned(), RawIndex::new(index.offset, index.length));
+        self.indexes.insert(
+            path.to_owned(),
+            RawIndex::new(index.volume_id, index.offset, index.length),
+        );
         Ok(())
     }
 
@@ -434,9 +442,9 @@ mod test {
         let mut file: File = tempfile::tempfile().unwrap();
 
         let indexes: Vec<Index> = vec![
-            Index::new("/tmp/file1".to_owned(), 0, 10),
-            Index::new("/tmp/file2".to_owned(), 10, 20),
-            Index::new("/tmp/file3".to_owned(), 20, 30),
+            Index::new("/tmp/file1".to_owned(), 1, 0, 10),
+            Index::new("/tmp/file2".to_owned(), 1, 10, 20),
+            Index::new("/tmp/file3".to_owned(), 1, 20, 30),
         ];
 
         for index in &indexes {
