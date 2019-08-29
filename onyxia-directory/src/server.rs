@@ -21,4 +21,12 @@ impl directory_grpc::Directory for DirectoryService {
         sink: ::grpcio::ServerStreamingSink<directory::ReadFileResponse>,
     ) {
     }
+
+    fn keepalive(
+        &mut self,
+        ctx: ::grpcio::RpcContext,
+        req: directory::KeepaliveRequest,
+        sink: ::grpcio::UnarySink<directory::KeepaliveResponse>,
+    ) {
+    }
 }

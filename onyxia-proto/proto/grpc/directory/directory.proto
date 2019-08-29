@@ -46,9 +46,17 @@ message ReadFileResponse {
   bytes data = 5;
 }
 
+message KeepaliveRequest {
+  string location = 1;
+  int64  status = 2;
+}
+
+message KeepaliveResponse {}
+
 // rpc services
 
 service Directory {
   rpc WriteFile(stream WriteFileRequest) returns (WriteFileResponse) {};
   rpc ReadFile(ReadFileRequest) returns (stream ReadFileResponse) {};
+  rpc Keepalive(KeepaliveRequest) returns (KeepaliveResponse) {};
 }

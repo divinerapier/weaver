@@ -84,6 +84,13 @@ const METHOD_DIRECTORY_READ_FILE: ::grpcio::Method<super::directory::ReadFileReq
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
+const METHOD_DIRECTORY_KEEPALIVE: ::grpcio::Method<super::directory::KeepaliveRequest, super::directory::KeepaliveResponse> = ::grpcio::Method {
+    ty: ::grpcio::MethodType::Unary,
+    name: "/Directory/Keepalive",
+    req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+    resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+};
+
 #[derive(Clone)]
 pub struct DirectoryClient {
     client: ::grpcio::Client,
@@ -111,6 +118,22 @@ impl DirectoryClient {
     pub fn read_file(&self, req: &super::directory::ReadFileRequest) -> ::grpcio::Result<::grpcio::ClientSStreamReceiver<super::directory::ReadFileResponse>> {
         self.read_file_opt(req, ::grpcio::CallOption::default())
     }
+
+    pub fn keepalive_opt(&self, req: &super::directory::KeepaliveRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::directory::KeepaliveResponse> {
+        self.client.unary_call(&METHOD_DIRECTORY_KEEPALIVE, req, opt)
+    }
+
+    pub fn keepalive(&self, req: &super::directory::KeepaliveRequest) -> ::grpcio::Result<super::directory::KeepaliveResponse> {
+        self.keepalive_opt(req, ::grpcio::CallOption::default())
+    }
+
+    pub fn keepalive_async_opt(&self, req: &super::directory::KeepaliveRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::directory::KeepaliveResponse>> {
+        self.client.unary_call_async(&METHOD_DIRECTORY_KEEPALIVE, req, opt)
+    }
+
+    pub fn keepalive_async(&self, req: &super::directory::KeepaliveRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::directory::KeepaliveResponse>> {
+        self.keepalive_async_opt(req, ::grpcio::CallOption::default())
+    }
     pub fn spawn<F>(&self, f: F) where F: ::futures::Future<Item = (), Error = ()> + Send + 'static {
         self.client.spawn(f)
     }
@@ -119,6 +142,7 @@ impl DirectoryClient {
 pub trait Directory {
     fn write_file(&mut self, ctx: ::grpcio::RpcContext, stream: ::grpcio::RequestStream<super::directory::WriteFileRequest>, sink: ::grpcio::ClientStreamingSink<super::directory::WriteFileResponse>);
     fn read_file(&mut self, ctx: ::grpcio::RpcContext, req: super::directory::ReadFileRequest, sink: ::grpcio::ServerStreamingSink<super::directory::ReadFileResponse>);
+    fn keepalive(&mut self, ctx: ::grpcio::RpcContext, req: super::directory::KeepaliveRequest, sink: ::grpcio::UnarySink<super::directory::KeepaliveResponse>);
 }
 
 pub fn create_directory<S: Directory + Send + Clone + 'static>(s: S) -> ::grpcio::Service {
@@ -127,9 +151,13 @@ pub fn create_directory<S: Directory + Send + Clone + 'static>(s: S) -> ::grpcio
     builder = builder.add_client_streaming_handler(&METHOD_DIRECTORY_WRITE_FILE, move |ctx, req, resp| {
         instance.write_file(ctx, req, resp)
     });
-    let mut instance = s;
+    let mut instance = s.clone();
     builder = builder.add_server_streaming_handler(&METHOD_DIRECTORY_READ_FILE, move |ctx, req, resp| {
         instance.read_file(ctx, req, resp)
+    });
+    let mut instance = s;
+    builder = builder.add_unary_handler(&METHOD_DIRECTORY_KEEPALIVE, move |ctx, req, resp| {
+        instance.keepalive(ctx, req, resp)
     });
     builder.build()
 }
