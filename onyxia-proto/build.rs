@@ -1,10 +1,7 @@
 fn main() {
     // let out_dir = env::var("OUT_DIR").unwrap();
     let out_dir = "src";
-    let modules = &[
-        ("grpc/directory", "directory"),
-        ("grpc/store", "store"),
-    ];
+    let modules = &[("grpc/directory", "directory"), ("grpc/store", "store")];
     for (dir, package) in modules {
         let out_dir = format!("{}/{}", out_dir, package);
         let files: Vec<_> = walkdir::WalkDir::new(format!("proto/{}", dir))

@@ -1,8 +1,6 @@
 use onyxia_proto::directory::directory;
 use onyxia_proto::directory::directory_grpc;
 
-use futures::future::Future;
-
 #[derive(Clone, Copy)] // clone trait required by `fn create_directory`
 pub struct DirectoryService;
 

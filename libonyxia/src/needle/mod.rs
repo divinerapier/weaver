@@ -10,6 +10,10 @@ pub struct Needle {
     pub length: usize,
 }
 
+pub struct NeedleHeader {
+    pub header_length: u16,
+}
+
 pub enum NeedleBody {
     SinglePart(Bytes),
     MultiParts(Receiver<Result<Bytes>>),

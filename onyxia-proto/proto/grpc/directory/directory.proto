@@ -23,32 +23,17 @@ message CommonStatus {
 
 // message for directory service
 
-message WriteFileRequest {
-  string path = 1;
-  int64 offset = 2;
-  int64 length = 3;
-  bytes data = 4;
-}
+message AssignRequest { int32 replication_count = 1; }
 
-message WriteFileResponse { CommonStatus status = 1; }
-
-message ReadFileRequest {
-  string path = 1;
-  int64 offset = 2;
-  int64 length = 3;
-}
-
-message ReadFileResponse {
-  CommonStatus status = 1;
-  string path = 2;
-  int64 offset = 3;
-  int64 length = 4;
-  bytes data = 5;
+message AssignResponse {
+  string master = 1;
+  repeated string slaves = 2;
+  string file_id = 3;
 }
 
 message KeepaliveRequest {
   string location = 1;
-  int64  status = 2;
+  int64 status = 2;
 }
 
 message KeepaliveResponse {}
@@ -56,7 +41,6 @@ message KeepaliveResponse {}
 // rpc services
 
 service Directory {
-  rpc WriteFile(stream WriteFileRequest) returns (WriteFileResponse) {};
-  rpc ReadFile(ReadFileRequest) returns (stream ReadFileResponse) {};
-  rpc Keepalive(KeepaliveRequest) returns (KeepaliveResponse) {};
+  rpc Assign(AssignRequest) returns (AssignResponse) {};
+  rpc Keepalive(stream KeepaliveRequest) returns (stream KeepaliveResponse) {};
 }
