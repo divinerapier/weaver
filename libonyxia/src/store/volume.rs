@@ -1,6 +1,6 @@
 use crate::error::{self, Error, Result};
 use crate::index::{Index, RawIndex};
-use crate::needle::{Needle, NeedleBody};
+use crate::needle::{Needle, NeedleBody, NeedleHeader};
 use crate::utils::{self, size::Size};
 
 use std::collections::HashMap;
@@ -256,7 +256,7 @@ impl Volume {
         return length_after_write <= self.max_length;
     }
 
-    pub fn write_needle(&mut self, path: &str, needle: &Needle) -> Result<()> {
+    pub fn write_needle(&mut self, path: &str, needle: Needle) -> Result<()> {
         let length = needle.length;
         if !self.can_write(length as u64) {
             log::error!(
@@ -276,40 +276,44 @@ impl Volume {
             ))));
         }
         let mut received_length = 0usize;
-        self.writable_volume
-            .seek(SeekFrom::Start(self.current_length))?;
+        let mut writable_volume = self.writable_volume.try_clone()?;
+        writable_volume.seek(SeekFrom::Start(self.current_length))?;
 
-        let mut writer = BufWriter::new(self.writable_volume.try_clone()?);
-        let mut wrote = 0;
-        match &needle.body {
-            NeedleBody::SinglePart(data) => {
-                received_length += data.len();
-                writer.write_all(data.as_ref())?;
-            }
-            NeedleBody::MultiParts(receiver) => {
-                for data in receiver.iter() {
-                    match data {
-                        Ok(data) => {
-                            received_length += data.len();
-                            writer.write_all(data.as_ref())?;
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "failed to receive multiparts body. path: {}, error: {}",
-                                path,
-                                e
-                            );
-                            return Err(Error::volume(error::VolumeError::write_needle(
-                                path,
-                                format!("{:?}", e),
-                            )));
-                        }
-                    }
-                    wrote += 1;
-                    log::debug!("wrote multiparts. {}", wrote);
-                }
-            }
-        }
+        let mut writer = BufWriter::new(writable_volume);
+
+        let needle_iter = needle.into_iter();
+        for data in needle_iter {}
+
+        // let mut wrote = 0;
+        // match &needle.body {
+        //     NeedleBody::SinglePart(data) => {
+        //         received_length += data.len();
+        //         writer.write_all(data.as_ref())?;
+        //     }
+        //     NeedleBody::MultiParts(receiver) => {
+        //         for data in receiver.iter() {
+        //             match data {
+        //                 Ok(data) => {
+        //                     received_length += data.len();
+        //                     writer.write_all(data.as_ref())?;
+        //                 }
+        //                 Err(e) => {
+        //                     log::error!(
+        //                         "failed to receive multiparts body. path: {}, error: {}",
+        //                         path,
+        //                         e
+        //                     );
+        //                     return Err(Error::volume(error::VolumeError::write_needle(
+        //                         path,
+        //                         format!("{:?}", e),
+        //                     )));
+        //                 }
+        //             }
+        //             wrote += 1;
+        //             log::debug!("wrote multiparts. {}", wrote);
+        //         }
+        //     }
+        // }
 
         if received_length != length {
             log::error!(
@@ -369,10 +373,15 @@ impl Volume {
         }
         let body = self.read_needle(&index)?;
         Ok(Needle {
+            header: NeedleHeader::default(),
             body: body,
             length: index.length,
         })
     }
+
+    pub fn read_needle_header() {}
+
+    pub fn read_needle_body() {}
 
     pub fn read_needle(&self, index: &RawIndex) -> Result<NeedleBody> {
         let mut readonly_volume = self.readonly_volume.try_clone()?;

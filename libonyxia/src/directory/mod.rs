@@ -74,22 +74,10 @@ impl Directory {
         K: Into<String> + Clone + Display,
     {
         let mut retry_times = 3;
-        while let Err(volume_error) = self.try_write(path.clone(), &body) {
-            log::error!(
-                "directory try write. path: {}, error: {}",
-                path,
-                volume_error
-            );
-            if volume_error.is_retriable() && retry_times > 0 {
-                retry_times -= 1;
-                continue;
-            }
-            return Err(volume_error);
-        }
-        Ok(())
+        Ok(self.try_write(path.clone(), body)?)
     }
 
-    fn try_write<K>(&mut self, path: K, body: &Needle) -> Result<()>
+    fn try_write<K>(&mut self, path: K, body: Needle) -> Result<()>
     where
         K: Into<String>,
     {
@@ -99,7 +87,7 @@ impl Directory {
             .get_mut(volume_id)
             .ok_or(Error::volume(error::VolumeError::not_found(volume_id)))?;
         let path = path.into();
-        volume.write_needle(&path, &body)?;
+        volume.write_needle(&path, body)?;
         self.needle_map.insert(path.clone(), volume.id);
         if !volume.writable() {
             self.writable_volumes.remove(&volume_id);
@@ -212,6 +200,7 @@ impl Default for Directory {
 mod test {
     use super::*;
     use crate::needle::NeedleBody;
+    use crate::needle::NeedleHeader;
     use std::env;
 
     #[test]
@@ -236,6 +225,7 @@ mod test {
             {
                 log::debug!("test1",);
                 let needle = Needle {
+                    header: NeedleHeader::default(),
                     length: data1.len(),
                     body: NeedleBody::SinglePart(data1),
                 };
@@ -244,6 +234,7 @@ mod test {
             {
                 log::debug!("test2",);
                 let needle = Needle {
+                    header: NeedleHeader::default(),
                     length: data2.len(),
                     body: NeedleBody::SinglePart(data2),
                 };
@@ -252,6 +243,7 @@ mod test {
             {
                 log::debug!("test3",);
                 let needle = Needle {
+                    header: NeedleHeader::default(),
                     length: data3.len(),
                     body: NeedleBody::SinglePart(data3),
                 };
@@ -260,6 +252,7 @@ mod test {
             {
                 log::debug!("test4",);
                 let needle = Needle {
+                    header: NeedleHeader::default(),
                     length: data4.len(),
                     body: NeedleBody::SinglePart(data4),
                 };
@@ -268,6 +261,7 @@ mod test {
             {
                 log::debug!("test5",);
                 let needle = Needle {
+                    header: NeedleHeader::default(),
                     length: data5.len(),
                     body: NeedleBody::SinglePart(data5),
                 };
@@ -276,6 +270,7 @@ mod test {
             {
                 log::debug!("test6",);
                 let needle = Needle {
+                    header: NeedleHeader::default(),
                     length: data6.len(),
                     body: NeedleBody::SinglePart(data6),
                 };
@@ -291,6 +286,7 @@ mod test {
                     tx.send(Ok(data7_3)).unwrap();
                 });
                 let needle = Needle {
+                    header: NeedleHeader::default(),
                     length,
                     body: NeedleBody::MultiParts(rx),
                 };
