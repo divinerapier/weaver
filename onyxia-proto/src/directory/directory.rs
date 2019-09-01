@@ -1354,6 +1354,336 @@ impl ::protobuf::reflect::ProtobufValue for KeepaliveResponse {
     }
 }
 
+#[derive(PartialEq,Clone,Default)]
+pub struct RegisterStorageServiceRequest {
+    // message fields
+    pub location: ::std::string::String,
+    pub volume_id: i64,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a RegisterStorageServiceRequest {
+    fn default() -> &'a RegisterStorageServiceRequest {
+        <RegisterStorageServiceRequest as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl RegisterStorageServiceRequest {
+    pub fn new() -> RegisterStorageServiceRequest {
+        ::std::default::Default::default()
+    }
+
+    // string location = 1;
+
+
+    pub fn get_location(&self) -> &str {
+        &self.location
+    }
+    pub fn clear_location(&mut self) {
+        self.location.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_location(&mut self, v: ::std::string::String) {
+        self.location = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_location(&mut self) -> &mut ::std::string::String {
+        &mut self.location
+    }
+
+    // Take field
+    pub fn take_location(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.location, ::std::string::String::new())
+    }
+
+    // int64 volume_id = 2;
+
+
+    pub fn get_volume_id(&self) -> i64 {
+        self.volume_id
+    }
+    pub fn clear_volume_id(&mut self) {
+        self.volume_id = 0;
+    }
+
+    // Param is passed by value, moved
+    pub fn set_volume_id(&mut self, v: i64) {
+        self.volume_id = v;
+    }
+}
+
+impl ::protobuf::Message for RegisterStorageServiceRequest {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.location)?;
+                },
+                2 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_int64()?;
+                    self.volume_id = tmp;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if !self.location.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.location);
+        }
+        if self.volume_id != 0 {
+            my_size += ::protobuf::rt::value_size(2, self.volume_id, ::protobuf::wire_format::WireTypeVarint);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
+        if !self.location.is_empty() {
+            os.write_string(1, &self.location)?;
+        }
+        if self.volume_id != 0 {
+            os.write_int64(2, self.volume_id)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &dyn (::std::any::Any) {
+        self as &dyn (::std::any::Any)
+    }
+    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
+        self as &mut dyn (::std::any::Any)
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> RegisterStorageServiceRequest {
+        RegisterStorageServiceRequest::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "location",
+                    |m: &RegisterStorageServiceRequest| { &m.location },
+                    |m: &mut RegisterStorageServiceRequest| { &mut m.location },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeInt64>(
+                    "volume_id",
+                    |m: &RegisterStorageServiceRequest| { &m.volume_id },
+                    |m: &mut RegisterStorageServiceRequest| { &mut m.volume_id },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new::<RegisterStorageServiceRequest>(
+                    "RegisterStorageServiceRequest",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static RegisterStorageServiceRequest {
+        static mut instance: ::protobuf::lazy::Lazy<RegisterStorageServiceRequest> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const RegisterStorageServiceRequest,
+        };
+        unsafe {
+            instance.get(RegisterStorageServiceRequest::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for RegisterStorageServiceRequest {
+    fn clear(&mut self) {
+        self.location.clear();
+        self.volume_id = 0;
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for RegisterStorageServiceRequest {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for RegisterStorageServiceRequest {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct RegisterStorageServiceResponse {
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a RegisterStorageServiceResponse {
+    fn default() -> &'a RegisterStorageServiceResponse {
+        <RegisterStorageServiceResponse as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl RegisterStorageServiceResponse {
+    pub fn new() -> RegisterStorageServiceResponse {
+        ::std::default::Default::default()
+    }
+}
+
+impl ::protobuf::Message for RegisterStorageServiceResponse {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &dyn (::std::any::Any) {
+        self as &dyn (::std::any::Any)
+    }
+    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
+        self as &mut dyn (::std::any::Any)
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> RegisterStorageServiceResponse {
+        RegisterStorageServiceResponse::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let fields = ::std::vec::Vec::new();
+                ::protobuf::reflect::MessageDescriptor::new::<RegisterStorageServiceResponse>(
+                    "RegisterStorageServiceResponse",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static RegisterStorageServiceResponse {
+        static mut instance: ::protobuf::lazy::Lazy<RegisterStorageServiceResponse> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const RegisterStorageServiceResponse,
+        };
+        unsafe {
+            instance.get(RegisterStorageServiceResponse::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for RegisterStorageServiceResponse {
+    fn clear(&mut self) {
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for RegisterStorageServiceResponse {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for RegisterStorageServiceResponse {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x1egrpc/directory/directory.proto\"6\n\x20ExampleDirectoryWriteFileRe\
     quest\x12\x12\n\x04path\x18\x01\x20\x01(\tR\x04path\"K\n!ExampleDirector\
@@ -1366,70 +1696,86 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x18\x02\x20\x03(\tR\x06slaves\x12\x17\n\x07file_id\x18\x03\x20\x01(\tR\
     \x06fileId\"F\n\x10KeepaliveRequest\x12\x1a\n\x08location\x18\x01\x20\
     \x01(\tR\x08location\x12\x16\n\x06status\x18\x02\x20\x01(\x03R\x06status\
-    \"\x13\n\x11KeepaliveResponse2h\n\x10ExampleDirectory\x12T\n\tWriteFile\
-    \x12!.ExampleDirectoryWriteFileRequest\x1a\".ExampleDirectoryWriteFileRe\
-    sponse\"\02r\n\tDirectory\x12+\n\x06Assign\x12\x0e.AssignRequest\x1a\x0f\
-    .AssignResponse\"\0\x128\n\tKeepalive\x12\x11.KeepaliveRequest\x1a\x12.K\
-    eepaliveResponse\"\0(\x010\x01J\x82\n\n\x06\x12\x04\0\0-\x01\n\x08\n\x01\
-    \x0c\x12\x03\0\0\x12\n!\n\x02\x04\0\x12\x03\x04\0=2\x16\x20message\x20fo\
-    r\x20examples\n\n\n\n\x03\x04\0\x01\x12\x03\x04\x08(\n\x0b\n\x04\x04\0\
-    \x02\0\x12\x03\x04+;\n\x0c\n\x05\x04\0\x02\0\x04\x12\x03\x04+*\n\x0c\n\
-    \x05\x04\0\x02\0\x05\x12\x03\x04+1\n\x0c\n\x05\x04\0\x02\0\x01\x12\x03\
-    \x0426\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\x049:\n\n\n\x02\x04\x01\x12\
-    \x04\x06\0\t\x01\n\n\n\x03\x04\x01\x01\x12\x03\x06\x08)\n\x0b\n\x04\x04\
-    \x01\x02\0\x12\x03\x07\x02\x12\n\r\n\x05\x04\x01\x02\0\x04\x12\x04\x07\
-    \x02\x06+\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\x07\x02\x08\n\x0c\n\x05\
-    \x04\x01\x02\0\x01\x12\x03\x07\t\r\n\x0c\n\x05\x04\x01\x02\0\x03\x12\x03\
-    \x07\x10\x11\n\x0b\n\x04\x04\x01\x02\x01\x12\x03\x08\x02\x11\n\r\n\x05\
-    \x04\x01\x02\x01\x04\x12\x04\x08\x02\x07\x12\n\x0c\n\x05\x04\x01\x02\x01\
-    \x05\x12\x03\x08\x02\x07\n\x0c\n\x05\x04\x01\x02\x01\x01\x12\x03\x08\x08\
-    \x0c\n\x0c\n\x05\x04\x01\x02\x01\x03\x12\x03\x08\x0f\x10\n\n\n\x02\x06\0\
-    \x12\x04\x0b\0\x0e\x01\n\n\n\x03\x06\0\x01\x12\x03\x0b\x08\x18\n\x0c\n\
-    \x04\x06\0\x02\0\x12\x04\x0c\x02\r4\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03\
-    \x0c\x06\x0f\n\x0c\n\x05\x06\0\x02\0\x02\x12\x03\x0c\x100\n\x0c\n\x05\
-    \x06\0\x02\0\x03\x12\x03\r\x0f0\n\x1b\n\x02\x04\x02\x12\x04\x12\0\x15\
-    \x012\x0f\x20common\x20status\n\n\n\n\x03\x04\x02\x01\x12\x03\x12\x08\
-    \x14\n\x0b\n\x04\x04\x02\x02\0\x12\x03\x13\x02\x18\n\r\n\x05\x04\x02\x02\
-    \0\x04\x12\x04\x13\x02\x12\x16\n\x0c\n\x05\x04\x02\x02\0\x05\x12\x03\x13\
-    \x02\x07\n\x0c\n\x05\x04\x02\x02\0\x01\x12\x03\x13\x08\x13\n\x0c\n\x05\
-    \x04\x02\x02\0\x03\x12\x03\x13\x16\x17\n\x0b\n\x04\x04\x02\x02\x01\x12\
-    \x03\x14\x02\x15\n\r\n\x05\x04\x02\x02\x01\x04\x12\x04\x14\x02\x13\x18\n\
-    \x0c\n\x05\x04\x02\x02\x01\x05\x12\x03\x14\x02\x08\n\x0c\n\x05\x04\x02\
-    \x02\x01\x01\x12\x03\x14\t\x10\n\x0c\n\x05\x04\x02\x02\x01\x03\x12\x03\
-    \x14\x13\x14\n*\n\x02\x04\x03\x12\x03\x19\062\x1f\x20message\x20for\x20d\
-    irectory\x20service\n\n\n\n\x03\x04\x03\x01\x12\x03\x19\x08\x15\n\x0b\n\
-    \x04\x04\x03\x02\0\x12\x03\x19\x184\n\x0c\n\x05\x04\x03\x02\0\x04\x12\
-    \x03\x19\x18\x17\n\x0c\n\x05\x04\x03\x02\0\x05\x12\x03\x19\x18\x1d\n\x0c\
-    \n\x05\x04\x03\x02\0\x01\x12\x03\x19\x1e/\n\x0c\n\x05\x04\x03\x02\0\x03\
-    \x12\x03\x1923\n\n\n\x02\x04\x04\x12\x04\x1b\0\x1f\x01\n\n\n\x03\x04\x04\
-    \x01\x12\x03\x1b\x08\x16\n\x0b\n\x04\x04\x04\x02\0\x12\x03\x1c\x02\x14\n\
-    \r\n\x05\x04\x04\x02\0\x04\x12\x04\x1c\x02\x1b\x18\n\x0c\n\x05\x04\x04\
-    \x02\0\x05\x12\x03\x1c\x02\x08\n\x0c\n\x05\x04\x04\x02\0\x01\x12\x03\x1c\
-    \t\x0f\n\x0c\n\x05\x04\x04\x02\0\x03\x12\x03\x1c\x12\x13\n\x0b\n\x04\x04\
-    \x04\x02\x01\x12\x03\x1d\x02\x1d\n\x0c\n\x05\x04\x04\x02\x01\x04\x12\x03\
-    \x1d\x02\n\n\x0c\n\x05\x04\x04\x02\x01\x05\x12\x03\x1d\x0b\x11\n\x0c\n\
-    \x05\x04\x04\x02\x01\x01\x12\x03\x1d\x12\x18\n\x0c\n\x05\x04\x04\x02\x01\
-    \x03\x12\x03\x1d\x1b\x1c\n\x0b\n\x04\x04\x04\x02\x02\x12\x03\x1e\x02\x15\
-    \n\r\n\x05\x04\x04\x02\x02\x04\x12\x04\x1e\x02\x1d\x1d\n\x0c\n\x05\x04\
-    \x04\x02\x02\x05\x12\x03\x1e\x02\x08\n\x0c\n\x05\x04\x04\x02\x02\x01\x12\
-    \x03\x1e\t\x10\n\x0c\n\x05\x04\x04\x02\x02\x03\x12\x03\x1e\x13\x14\n\n\n\
-    \x02\x04\x05\x12\x04!\0$\x01\n\n\n\x03\x04\x05\x01\x12\x03!\x08\x18\n\
-    \x0b\n\x04\x04\x05\x02\0\x12\x03\"\x02\x16\n\r\n\x05\x04\x05\x02\0\x04\
-    \x12\x04\"\x02!\x1a\n\x0c\n\x05\x04\x05\x02\0\x05\x12\x03\"\x02\x08\n\
-    \x0c\n\x05\x04\x05\x02\0\x01\x12\x03\"\t\x11\n\x0c\n\x05\x04\x05\x02\0\
-    \x03\x12\x03\"\x14\x15\n\x0b\n\x04\x04\x05\x02\x01\x12\x03#\x02\x13\n\r\
-    \n\x05\x04\x05\x02\x01\x04\x12\x04#\x02\"\x16\n\x0c\n\x05\x04\x05\x02\
-    \x01\x05\x12\x03#\x02\x07\n\x0c\n\x05\x04\x05\x02\x01\x01\x12\x03#\x08\
-    \x0e\n\x0c\n\x05\x04\x05\x02\x01\x03\x12\x03#\x11\x12\n\t\n\x02\x04\x06\
-    \x12\x03&\0\x1c\n\n\n\x03\x04\x06\x01\x12\x03&\x08\x19\n\x1a\n\x02\x06\
-    \x01\x12\x04*\0-\x012\x0e\x20rpc\x20services\n\n\n\n\x03\x06\x01\x01\x12\
-    \x03*\x08\x11\n\x0b\n\x04\x06\x01\x02\0\x12\x03+\x027\n\x0c\n\x05\x06\
-    \x01\x02\0\x01\x12\x03+\x06\x0c\n\x0c\n\x05\x06\x01\x02\0\x02\x12\x03+\r\
-    \x1a\n\x0c\n\x05\x06\x01\x02\0\x03\x12\x03+%3\n\x0b\n\x04\x06\x01\x02\
-    \x01\x12\x03,\x02N\n\x0c\n\x05\x06\x01\x02\x01\x01\x12\x03,\x06\x0f\n\
-    \x0c\n\x05\x06\x01\x02\x01\x05\x12\x03,\x10\x16\n\x0c\n\x05\x06\x01\x02\
-    \x01\x02\x12\x03,\x17'\n\x0c\n\x05\x06\x01\x02\x01\x06\x12\x03,28\n\x0c\
-    \n\x05\x06\x01\x02\x01\x03\x12\x03,9Jb\x06proto3\
+    \"\x13\n\x11KeepaliveResponse\"X\n\x1dRegisterStorageServiceRequest\x12\
+    \x1a\n\x08location\x18\x01\x20\x01(\tR\x08location\x12\x1b\n\tvolume_id\
+    \x18\x02\x20\x01(\x03R\x08volumeId\"\x20\n\x1eRegisterStorageServiceResp\
+    onse2h\n\x10ExampleDirectory\x12T\n\tWriteFile\x12!.ExampleDirectoryWrit\
+    eFileRequest\x1a\".ExampleDirectoryWriteFileResponse\"\02\xcf\x01\n\tDir\
+    ectory\x12+\n\x06Assign\x12\x0e.AssignRequest\x1a\x0f.AssignResponse\"\0\
+    \x128\n\tKeepalive\x12\x11.KeepaliveRequest\x1a\x12.KeepaliveResponse\"\
+    \0(\x010\x01\x12[\n\x16RegisterStorageService\x12\x1e.RegisterStorageSer\
+    viceRequest\x1a\x1f.RegisterStorageServiceResponse(\x01J\xf3\x0b\n\x06\
+    \x12\x04\0\06\x01\n\x08\n\x01\x0c\x12\x03\0\0\x12\n!\n\x02\x04\0\x12\x03\
+    \x04\0=2\x16\x20message\x20for\x20examples\n\n\n\n\x03\x04\0\x01\x12\x03\
+    \x04\x08(\n\x0b\n\x04\x04\0\x02\0\x12\x03\x04+;\n\x0c\n\x05\x04\0\x02\0\
+    \x04\x12\x03\x04+*\n\x0c\n\x05\x04\0\x02\0\x05\x12\x03\x04+1\n\x0c\n\x05\
+    \x04\0\x02\0\x01\x12\x03\x0426\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\x049:\
+    \n\n\n\x02\x04\x01\x12\x04\x06\0\t\x01\n\n\n\x03\x04\x01\x01\x12\x03\x06\
+    \x08)\n\x0b\n\x04\x04\x01\x02\0\x12\x03\x07\x02\x12\n\r\n\x05\x04\x01\
+    \x02\0\x04\x12\x04\x07\x02\x06+\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\
+    \x07\x02\x08\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\x07\t\r\n\x0c\n\x05\
+    \x04\x01\x02\0\x03\x12\x03\x07\x10\x11\n\x0b\n\x04\x04\x01\x02\x01\x12\
+    \x03\x08\x02\x11\n\r\n\x05\x04\x01\x02\x01\x04\x12\x04\x08\x02\x07\x12\n\
+    \x0c\n\x05\x04\x01\x02\x01\x05\x12\x03\x08\x02\x07\n\x0c\n\x05\x04\x01\
+    \x02\x01\x01\x12\x03\x08\x08\x0c\n\x0c\n\x05\x04\x01\x02\x01\x03\x12\x03\
+    \x08\x0f\x10\n\n\n\x02\x06\0\x12\x04\x0b\0\x0e\x01\n\n\n\x03\x06\0\x01\
+    \x12\x03\x0b\x08\x18\n\x0c\n\x04\x06\0\x02\0\x12\x04\x0c\x02\r4\n\x0c\n\
+    \x05\x06\0\x02\0\x01\x12\x03\x0c\x06\x0f\n\x0c\n\x05\x06\0\x02\0\x02\x12\
+    \x03\x0c\x100\n\x0c\n\x05\x06\0\x02\0\x03\x12\x03\r\x0f0\n\x1b\n\x02\x04\
+    \x02\x12\x04\x12\0\x15\x012\x0f\x20common\x20status\n\n\n\n\x03\x04\x02\
+    \x01\x12\x03\x12\x08\x14\n\x0b\n\x04\x04\x02\x02\0\x12\x03\x13\x02\x18\n\
+    \r\n\x05\x04\x02\x02\0\x04\x12\x04\x13\x02\x12\x16\n\x0c\n\x05\x04\x02\
+    \x02\0\x05\x12\x03\x13\x02\x07\n\x0c\n\x05\x04\x02\x02\0\x01\x12\x03\x13\
+    \x08\x13\n\x0c\n\x05\x04\x02\x02\0\x03\x12\x03\x13\x16\x17\n\x0b\n\x04\
+    \x04\x02\x02\x01\x12\x03\x14\x02\x15\n\r\n\x05\x04\x02\x02\x01\x04\x12\
+    \x04\x14\x02\x13\x18\n\x0c\n\x05\x04\x02\x02\x01\x05\x12\x03\x14\x02\x08\
+    \n\x0c\n\x05\x04\x02\x02\x01\x01\x12\x03\x14\t\x10\n\x0c\n\x05\x04\x02\
+    \x02\x01\x03\x12\x03\x14\x13\x14\n*\n\x02\x04\x03\x12\x03\x19\062\x1f\
+    \x20message\x20for\x20directory\x20service\n\n\n\n\x03\x04\x03\x01\x12\
+    \x03\x19\x08\x15\n\x0b\n\x04\x04\x03\x02\0\x12\x03\x19\x184\n\x0c\n\x05\
+    \x04\x03\x02\0\x04\x12\x03\x19\x18\x17\n\x0c\n\x05\x04\x03\x02\0\x05\x12\
+    \x03\x19\x18\x1d\n\x0c\n\x05\x04\x03\x02\0\x01\x12\x03\x19\x1e/\n\x0c\n\
+    \x05\x04\x03\x02\0\x03\x12\x03\x1923\n\n\n\x02\x04\x04\x12\x04\x1b\0\x1f\
+    \x01\n\n\n\x03\x04\x04\x01\x12\x03\x1b\x08\x16\n\x0b\n\x04\x04\x04\x02\0\
+    \x12\x03\x1c\x02\x14\n\r\n\x05\x04\x04\x02\0\x04\x12\x04\x1c\x02\x1b\x18\
+    \n\x0c\n\x05\x04\x04\x02\0\x05\x12\x03\x1c\x02\x08\n\x0c\n\x05\x04\x04\
+    \x02\0\x01\x12\x03\x1c\t\x0f\n\x0c\n\x05\x04\x04\x02\0\x03\x12\x03\x1c\
+    \x12\x13\n\x0b\n\x04\x04\x04\x02\x01\x12\x03\x1d\x02\x1d\n\x0c\n\x05\x04\
+    \x04\x02\x01\x04\x12\x03\x1d\x02\n\n\x0c\n\x05\x04\x04\x02\x01\x05\x12\
+    \x03\x1d\x0b\x11\n\x0c\n\x05\x04\x04\x02\x01\x01\x12\x03\x1d\x12\x18\n\
+    \x0c\n\x05\x04\x04\x02\x01\x03\x12\x03\x1d\x1b\x1c\n\x0b\n\x04\x04\x04\
+    \x02\x02\x12\x03\x1e\x02\x15\n\r\n\x05\x04\x04\x02\x02\x04\x12\x04\x1e\
+    \x02\x1d\x1d\n\x0c\n\x05\x04\x04\x02\x02\x05\x12\x03\x1e\x02\x08\n\x0c\n\
+    \x05\x04\x04\x02\x02\x01\x12\x03\x1e\t\x10\n\x0c\n\x05\x04\x04\x02\x02\
+    \x03\x12\x03\x1e\x13\x14\n\n\n\x02\x04\x05\x12\x04!\0$\x01\n\n\n\x03\x04\
+    \x05\x01\x12\x03!\x08\x18\n\x0b\n\x04\x04\x05\x02\0\x12\x03\"\x02\x16\n\
+    \r\n\x05\x04\x05\x02\0\x04\x12\x04\"\x02!\x1a\n\x0c\n\x05\x04\x05\x02\0\
+    \x05\x12\x03\"\x02\x08\n\x0c\n\x05\x04\x05\x02\0\x01\x12\x03\"\t\x11\n\
+    \x0c\n\x05\x04\x05\x02\0\x03\x12\x03\"\x14\x15\n\x0b\n\x04\x04\x05\x02\
+    \x01\x12\x03#\x02\x13\n\r\n\x05\x04\x05\x02\x01\x04\x12\x04#\x02\"\x16\n\
+    \x0c\n\x05\x04\x05\x02\x01\x05\x12\x03#\x02\x07\n\x0c\n\x05\x04\x05\x02\
+    \x01\x01\x12\x03#\x08\x0e\n\x0c\n\x05\x04\x05\x02\x01\x03\x12\x03#\x11\
+    \x12\n\t\n\x02\x04\x06\x12\x03&\0\x1c\n\n\n\x03\x04\x06\x01\x12\x03&\x08\
+    \x19\n\n\n\x02\x04\x07\x12\x04(\0+\x01\n\n\n\x03\x04\x07\x01\x12\x03(\
+    \x08%\n\x0b\n\x04\x04\x07\x02\0\x12\x03)\x02\x16\n\r\n\x05\x04\x07\x02\0\
+    \x04\x12\x04)\x02('\n\x0c\n\x05\x04\x07\x02\0\x05\x12\x03)\x02\x08\n\x0c\
+    \n\x05\x04\x07\x02\0\x01\x12\x03)\t\x11\n\x0c\n\x05\x04\x07\x02\0\x03\
+    \x12\x03)\x14\x15\n\x0b\n\x04\x04\x07\x02\x01\x12\x03*\x02\x17\n\r\n\x05\
+    \x04\x07\x02\x01\x04\x12\x04*\x02)\x16\n\x0c\n\x05\x04\x07\x02\x01\x05\
+    \x12\x03*\x02\x07\n\x0c\n\x05\x04\x07\x02\x01\x01\x12\x03*\t\x12\n\x0c\n\
+    \x05\x04\x07\x02\x01\x03\x12\x03*\x15\x16\n\n\n\x02\x04\x08\x12\x04-\0/\
+    \x01\n\n\n\x03\x04\x08\x01\x12\x03-\x08&\n\n\n\x02\x06\x01\x12\x042\06\
+    \x01\n\n\n\x03\x06\x01\x01\x12\x032\x08\x11\n\x0b\n\x04\x06\x01\x02\0\
+    \x12\x033\x027\n\x0c\n\x05\x06\x01\x02\0\x01\x12\x033\x06\x0c\n\x0c\n\
+    \x05\x06\x01\x02\0\x02\x12\x033\r\x1a\n\x0c\n\x05\x06\x01\x02\0\x03\x12\
+    \x033%3\n\x0b\n\x04\x06\x01\x02\x01\x12\x034\x02N\n\x0c\n\x05\x06\x01\
+    \x02\x01\x01\x12\x034\x06\x0f\n\x0c\n\x05\x06\x01\x02\x01\x05\x12\x034\
+    \x10\x16\n\x0c\n\x05\x06\x01\x02\x01\x02\x12\x034\x17'\n\x0c\n\x05\x06\
+    \x01\x02\x01\x06\x12\x03428\n\x0c\n\x05\x06\x01\x02\x01\x03\x12\x0349J\n\
+    \x0b\n\x04\x06\x01\x02\x02\x12\x035\x02l\n\x0c\n\x05\x06\x01\x02\x02\x01\
+    \x12\x035\x06\x1c\n\x0c\n\x05\x06\x01\x02\x02\x05\x12\x035\x1d#\n\x0c\n\
+    \x05\x06\x01\x02\x02\x02\x12\x035$A\n\x0c\n\x05\x06\x01\x02\x02\x03\x12\
+    \x035Ljb\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

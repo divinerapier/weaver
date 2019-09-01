@@ -84,6 +84,13 @@ const METHOD_DIRECTORY_KEEPALIVE: ::grpcio::Method<super::directory::KeepaliveRe
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
+const METHOD_DIRECTORY_REGISTER_STORAGE_SERVICE: ::grpcio::Method<super::directory::RegisterStorageServiceRequest, super::directory::RegisterStorageServiceResponse> = ::grpcio::Method {
+    ty: ::grpcio::MethodType::ClientStreaming,
+    name: "/Directory/RegisterStorageService",
+    req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+    resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+};
+
 #[derive(Clone)]
 pub struct DirectoryClient {
     client: ::grpcio::Client,
@@ -119,6 +126,14 @@ impl DirectoryClient {
     pub fn keepalive(&self) -> ::grpcio::Result<(::grpcio::ClientDuplexSender<super::directory::KeepaliveRequest>, ::grpcio::ClientDuplexReceiver<super::directory::KeepaliveResponse>)> {
         self.keepalive_opt(::grpcio::CallOption::default())
     }
+
+    pub fn register_storage_service_opt(&self, opt: ::grpcio::CallOption) -> ::grpcio::Result<(::grpcio::ClientCStreamSender<super::directory::RegisterStorageServiceRequest>, ::grpcio::ClientCStreamReceiver<super::directory::RegisterStorageServiceResponse>)> {
+        self.client.client_streaming(&METHOD_DIRECTORY_REGISTER_STORAGE_SERVICE, opt)
+    }
+
+    pub fn register_storage_service(&self) -> ::grpcio::Result<(::grpcio::ClientCStreamSender<super::directory::RegisterStorageServiceRequest>, ::grpcio::ClientCStreamReceiver<super::directory::RegisterStorageServiceResponse>)> {
+        self.register_storage_service_opt(::grpcio::CallOption::default())
+    }
     pub fn spawn<F>(&self, f: F) where F: ::futures::Future<Item = (), Error = ()> + Send + 'static {
         self.client.spawn(f)
     }
@@ -127,6 +142,7 @@ impl DirectoryClient {
 pub trait Directory {
     fn assign(&mut self, ctx: ::grpcio::RpcContext, req: super::directory::AssignRequest, sink: ::grpcio::UnarySink<super::directory::AssignResponse>);
     fn keepalive(&mut self, ctx: ::grpcio::RpcContext, stream: ::grpcio::RequestStream<super::directory::KeepaliveRequest>, sink: ::grpcio::DuplexSink<super::directory::KeepaliveResponse>);
+    fn register_storage_service(&mut self, ctx: ::grpcio::RpcContext, stream: ::grpcio::RequestStream<super::directory::RegisterStorageServiceRequest>, sink: ::grpcio::ClientStreamingSink<super::directory::RegisterStorageServiceResponse>);
 }
 
 pub fn create_directory<S: Directory + Send + Clone + 'static>(s: S) -> ::grpcio::Service {
@@ -135,9 +151,13 @@ pub fn create_directory<S: Directory + Send + Clone + 'static>(s: S) -> ::grpcio
     builder = builder.add_unary_handler(&METHOD_DIRECTORY_ASSIGN, move |ctx, req, resp| {
         instance.assign(ctx, req, resp)
     });
-    let mut instance = s;
+    let mut instance = s.clone();
     builder = builder.add_duplex_streaming_handler(&METHOD_DIRECTORY_KEEPALIVE, move |ctx, req, resp| {
         instance.keepalive(ctx, req, resp)
+    });
+    let mut instance = s;
+    builder = builder.add_client_streaming_handler(&METHOD_DIRECTORY_REGISTER_STORAGE_SERVICE, move |ctx, req, resp| {
+        instance.register_storage_service(ctx, req, resp)
     });
     builder.build()
 }

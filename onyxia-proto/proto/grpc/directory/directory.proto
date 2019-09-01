@@ -38,9 +38,18 @@ message KeepaliveRequest {
 
 message KeepaliveResponse {}
 
+message RegisterStorageServiceRequest {
+  string location = 1;
+  int64  volume_id = 2;
+}
+
+message RegisterStorageServiceResponse {
+  
+}
 // rpc services
 
 service Directory {
   rpc Assign(AssignRequest) returns (AssignResponse) {};
   rpc Keepalive(stream KeepaliveRequest) returns (stream KeepaliveResponse) {};
+  rpc RegisterStorageService(stream RegisterStorageServiceRequest) returns (RegisterStorageServiceResponse);
 }

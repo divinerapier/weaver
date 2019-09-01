@@ -5,26 +5,27 @@ use onyxia_proto::directory::directory_grpc;
 pub struct DirectoryService;
 
 impl directory_grpc::Directory for DirectoryService {
-    fn write_file(
+    fn register_storage_service(
         &mut self,
         ctx: ::grpcio::RpcContext,
-        stream: ::grpcio::RequestStream<directory::WriteFileRequest>,
-        sink: ::grpcio::ClientStreamingSink<directory::WriteFileResponse>,
+        stream: ::grpcio::RequestStream<directory::RegisterStorageServiceRequest>,
+        sink: ::grpcio::ClientStreamingSink<directory::RegisterStorageServiceResponse>,
     ) {
     }
-    fn read_file(
+
+    fn assign(
         &mut self,
         ctx: ::grpcio::RpcContext,
-        req: directory::ReadFileRequest,
-        sink: ::grpcio::ServerStreamingSink<directory::ReadFileResponse>,
+        req: directory::AssignRequest,
+        sink: ::grpcio::UnarySink<directory::AssignResponse>,
     ) {
     }
 
     fn keepalive(
         &mut self,
         ctx: ::grpcio::RpcContext,
-        req: directory::KeepaliveRequest,
-        sink: ::grpcio::UnarySink<directory::KeepaliveResponse>,
+        stream: ::grpcio::RequestStream<directory::KeepaliveRequest>,
+        sink: ::grpcio::DuplexSink<directory::KeepaliveResponse>,
     ) {
     }
 }
