@@ -18,14 +18,18 @@ pub struct NeedleIterator {
 
 pub struct NeedleHeader {
     pub header_length: u16,
-    pub content_length: u32,
+    pub body_length: u32,
+    pub gzip: bool,
+    pub file_name: Option<String>,
 }
 
 impl Default for NeedleHeader {
     fn default() -> NeedleHeader {
         NeedleHeader {
             header_length: 0,
-            content_length: 0,
+            body_length: 0,
+            gzip: false,
+            file_name: None,
         }
     }
 }
@@ -40,7 +44,7 @@ impl NeedleHeader {
         let mut buffer = Vec::with_capacity(6);
         buffer.resize(6, 0);
         bytes::LittleEndian::write_u16(&mut buffer, self.header_length);
-        bytes::LittleEndian::write_u32(&mut buffer[2..6], self.content_length);
+        bytes::LittleEndian::write_u32(&mut buffer[2..6], self.body_length);
         Bytes::from(buffer)
     }
 }
@@ -50,7 +54,8 @@ impl From<Vec<u8>> for NeedleHeader {
         assert!(v.len() >= 6);
         NeedleHeader {
             header_length: bytes::LittleEndian::read_u16(&v[0..2]),
-            content_length: bytes::LittleEndian::read_u32(&v[2..6]),
+            body_length: bytes::LittleEndian::read_u32(&v[2..6]),
+            ..NeedleHeader::default()
         }
     }
 }

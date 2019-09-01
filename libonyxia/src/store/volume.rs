@@ -268,12 +268,12 @@ impl Volume {
                 self.current_length,
                 needle.length
             );
-            return Err(Error::retry(Error::volume(error::VolumeError::overflow(
+            return Err(Error::volume(error::VolumeError::overflow(
                 self.id,
                 self.max_length,
                 self.current_length,
                 length as u64,
-            ))));
+            )));
         }
         let mut received_length = 0usize;
         let mut writable_volume = self.writable_volume.try_clone()?;
@@ -282,38 +282,11 @@ impl Volume {
         let mut writer = BufWriter::new(writable_volume);
 
         let needle_iter = needle.into_iter();
-        for data in needle_iter {}
-
-        // let mut wrote = 0;
-        // match &needle.body {
-        //     NeedleBody::SinglePart(data) => {
-        //         received_length += data.len();
-        //         writer.write_all(data.as_ref())?;
-        //     }
-        //     NeedleBody::MultiParts(receiver) => {
-        //         for data in receiver.iter() {
-        //             match data {
-        //                 Ok(data) => {
-        //                     received_length += data.len();
-        //                     writer.write_all(data.as_ref())?;
-        //                 }
-        //                 Err(e) => {
-        //                     log::error!(
-        //                         "failed to receive multiparts body. path: {}, error: {}",
-        //                         path,
-        //                         e
-        //                     );
-        //                     return Err(Error::volume(error::VolumeError::write_needle(
-        //                         path,
-        //                         format!("{:?}", e),
-        //                     )));
-        //                 }
-        //             }
-        //             wrote += 1;
-        //             log::debug!("wrote multiparts. {}", wrote);
-        //         }
-        //     }
-        // }
+        for data in needle_iter {
+            let data = data?;
+            received_length += data.len();
+            writer.write_all(data.as_ref())?;
+        }
 
         if received_length != length {
             log::error!(
