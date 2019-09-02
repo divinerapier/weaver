@@ -2,7 +2,7 @@ use onyxia_proto::directory::directory;
 use onyxia_proto::directory::directory_grpc;
 
 #[derive(Clone, Copy)] // clone trait required by `fn create_directory`
-pub struct DirectoryService;
+pub struct DirectoryService {}
 
 impl directory_grpc::Directory for DirectoryService {
     fn register_storage_service(

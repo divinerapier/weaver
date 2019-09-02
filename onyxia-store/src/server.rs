@@ -1,11 +1,44 @@
+use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
+// use std::ops::Try;
+use std::path::{Path, PathBuf};
+
+use libonyxia::error::{self, Error, Result};
+use libonyxia::needle::Needle;
+use libonyxia::store::volume::Volume;
+use libonyxia::utils::size::Size;
+use onyxia_proto::store::*;
+
 use futures::future::Future;
 use futures::sink::Sink;
 use futures::stream::Stream;
 
-use onyxia_proto::store::*;
+#[derive(Clone)] // clone trait required by `fn create_directory`
+pub struct StoreService {
+    pub volumes_dir: PathBuf,
+    // pub volumes: Vec<Volume>,
 
-#[derive(Clone, Copy)] // clone trait required by `fn create_directory`
-pub struct StoreService;
+    // TODO: use a min-heap to store volumes? tuple(id, remain_length)
+    pub writable_volumes: HashSet<usize>,
+    pub readonly_volumes: HashSet<usize>,
+
+    /// map from file path to volume index in self.volumes
+    pub needle_map: HashMap<String, usize>,
+
+    pub volume_size: Size,
+}
+
+impl StoreService {
+    pub fn new(dir: &str) -> StoreService {
+        StoreService {
+            volumes_dir: PathBuf::from(dir),
+            writable_volumes: HashSet::new(),
+            readonly_volumes: HashSet::new(),
+            needle_map: HashMap::new(),
+            volume_size: Size::default(),
+        }
+    }
+}
 
 impl store_grpc::Store for StoreService {
     fn write_file(
