@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::Metadata;
 use std::path::{Path, PathBuf};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::store::volume::Volume;
 use crate::utils::size::Size;
 

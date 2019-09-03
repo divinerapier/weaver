@@ -41,7 +41,7 @@ impl From<&OsStr> for VolumeExtension {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Volume {
     pub id: usize,
     pub volume_path: String,
@@ -54,6 +54,12 @@ pub struct Volume {
     #[serde(skip_serializing)]
     pub index_file: File,
     pub indexes: HashMap<String, RawIndex>,
+}
+
+impl Display for Volume {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
 }
 
 impl Volume {
@@ -257,7 +263,7 @@ impl Volume {
     }
 
     pub fn write_needle(&mut self, path: &str, needle: Needle) -> Result<()> {
-        let length = needle.length;
+        let length = needle.total_length() as usize;
         if !self.can_write(length as u64) {
             log::error!(
                 "couldn't write to the volume. id: {}, path: {}, writable: {}, max_length: {}, current_length: {}, todo: {}",
@@ -266,7 +272,7 @@ impl Volume {
                 self.writable(),
                 self.max_length,
                 self.current_length,
-                needle.length
+               length
             );
             return Err(Error::volume(error::VolumeError::overflow(
                 self.id,
@@ -284,6 +290,7 @@ impl Volume {
         let needle_iter = needle.into_iter();
         for data in needle_iter {
             let data = data?;
+            log::debug!("data: {:?}", data);
             received_length += data.len();
             writer.write_all(data.as_ref())?;
         }
@@ -344,70 +351,85 @@ impl Volume {
             );
             return Err(Error::data_corruption(path, "index out of current length"));
         }
-        let body = self.read_needle(&index)?;
-        Ok(Needle {
-            header: NeedleHeader::default(),
-            body: body,
-            length: index.length,
-        })
+        Ok(self.read_needle(&index)?)
     }
 
-    pub fn read_needle_header() {}
+    pub fn read_needle_header(file: &mut File, offset: usize) -> Result<NeedleHeader> {
+        let mut buffer = Vec::with_capacity(4);
+        buffer.resize(4, 0 as u8);
+        file.seek(std::io::SeekFrom::Start(offset as u64))?;
+        file.read_exact(&mut buffer)?;
+        // automatically provides the implementation of [`Into`]
+        Ok(buffer.into())
+    }
 
     pub fn read_needle_body() {}
 
-    pub fn read_needle(&self, index: &RawIndex) -> Result<NeedleBody> {
+    pub fn read_needle(&self, index: &RawIndex) -> Result<Needle> {
         let mut readonly_volume = self.readonly_volume.try_clone()?;
-        readonly_volume.seek(std::io::SeekFrom::Start(index.offset as u64))?;
-        let batch_size = if index.length > 1024 * 1024 {
+        let needle_header = Self::read_needle_header(&mut readonly_volume, index.offset)?;
+        if needle_header.body_length as usize != index.length - 4 {
+            log::error!(
+                "length from index: {}, length from needle header: {}",
+                index.length,
+                needle_header.body_length
+            );
+        }
+        let batch_size = if needle_header.body_length > 1024 * 1024 {
             1024 * 1024 // 1M
         } else {
-            index.length
+            needle_header.body_length as usize
         };
+        readonly_volume.seek(std::io::SeekFrom::Start(index.offset as u64 + 4))?;
         let mut buffer = Vec::with_capacity(batch_size);
         buffer.resize(batch_size, 0 as u8);
         let mut readonly_volume = self.readonly_volume.try_clone()?;
         if index.length <= 1024 * 1024 {
             readonly_volume.read_exact(&mut buffer)?;
-            Ok(NeedleBody::SinglePart(bytes::Bytes::from(buffer)))
-        } else {
-            // TODO: using thread pool
-            let (tx, rx) = std::sync::mpsc::sync_channel(1);
-            let mut remains = index.length;
-            std::thread::spawn(move || {
-                while remains > 0 {
-                    let current = match readonly_volume.read(&mut buffer) {
-                        Ok(current) => current,
-                        Err(e) => {
-                            // NOTE: This function will never panic, but it may return [`Err`]
-                            // if the [`Receiver`] has disconnected and is no longer able to
-                            // receive information.
-                            match tx.send(Err(Error::io(e))) {
-                                Ok(_) => {}
-                                Err(send_error) => {
-                                    println!("failed to send error into channel. {:?}", send_error);
-                                }
+            return Ok(Needle {
+                header: needle_header,
+                body: NeedleBody::SinglePart(bytes::Bytes::from(buffer)),
+            });
+        }
+        // TODO: using thread pool
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        let mut remains = index.length;
+        std::thread::spawn(move || {
+            while remains > 0 {
+                let current = match readonly_volume.read(&mut buffer) {
+                    Ok(current) => current,
+                    Err(e) => {
+                        // NOTE: This function will never panic, but it may return [`Err`]
+                        // if the [`Receiver`] has disconnected and is no longer able to
+                        // receive information.
+                        match tx.send(Err(Error::io(e))) {
+                            Ok(_) => {}
+                            Err(send_error) => {
+                                println!("failed to send error into channel. {:?}", send_error);
                             }
-                            return;
                         }
-                    };
-                    remains -= current;
-                    match tx.send(Ok(bytes::Bytes::from(&buffer[0..current]))) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            match tx.send(Err(Error::channel(e.description()))) {
-                                Ok(_) => {}
-                                Err(send_error) => {
-                                    println!("failed to send error into channel. {:?}", send_error);
-                                }
+                        return;
+                    }
+                };
+                remains -= current;
+                match tx.send(Ok(bytes::Bytes::from(&buffer[0..current]))) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        match tx.send(Err(Error::channel(e.description()))) {
+                            Ok(_) => {}
+                            Err(send_error) => {
+                                println!("failed to send error into channel. {:?}", send_error);
                             }
-                            return;
                         }
+                        return;
                     }
                 }
-            });
-            Ok(NeedleBody::MultiParts(rx))
-        }
+            }
+        });
+        Ok(Needle {
+            header: needle_header,
+            body: NeedleBody::MultiParts(rx),
+        })
     }
 }
 
