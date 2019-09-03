@@ -1,4 +1,5 @@
 use std::io::Read;
+use std::sync::Arc;
 
 use futures::future::Future;
 

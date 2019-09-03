@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::fs::Metadata;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Result};
 use crate::store::volume::Volume;
+use crate::utils::size::Size;
 
 pub mod volume;
 
@@ -23,6 +24,9 @@ pub struct Store {
 impl Store {
     pub fn new(dir: &str) -> Result<Store> {
         let dir_result = std::fs::read_dir(dir)?;
+
+        let mut data_files = vec![];
+
         for entry in dir_result {
             let entry: std::fs::DirEntry = entry?;
             let metadata: Metadata = entry.metadata()?;
@@ -35,13 +39,32 @@ impl Store {
                     dir,
                     entry.file_name().to_str().unwrap(),
                 );
+                continue;
             }
             // filter data files and open them
+            // [`None`], if there is no file name;
+            // [`None`], if there is no embedded `.`;
+            // [`None`], if the file name begins with `.` and has no other `.`s within;
+            // Otherwise, the portion of the file name after the final `.`
+            if let Some(extension) = PathBuf::from(entry.file_name()).extension() {
+                if extension == "index" {
+                    data_files.push(entry.file_name());
+                }
+            } else {
+                log::warn!("open store. skip entry: {:?}", entry);
+            }
         }
+
+        let volumes: Result<Vec<Volume>> = data_files
+            .into_iter()
+            .map(|file_name| Volume::open(&Path::new(dir).join(&file_name), Size::default()))
+            .collect();
+
+        let volumes: Vec<Volume> = volumes?;
 
         Ok(Store {
             volumes_dir: PathBuf::from(dir),
-            volumes: Vec::new(),
+            volumes,
             writable_volumes: HashSet::new(),
             readonly_volumes: HashSet::new(),
             needle_map: HashMap::new(),
