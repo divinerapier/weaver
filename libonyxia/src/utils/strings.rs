@@ -1,8 +1,8 @@
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 pub fn trim_suffix<'a>(s: &'a str, sub: &str) -> Result<&'a str> {
     if !s.ends_with(sub) {
-        Err(Error::naive(format!("{} is not ending with {}", s, sub)))
+        Err(boxed_naive!("{} is not ending with {}", s, sub))
     } else {
         Ok(&s[0..s.len() - sub.len()])
     }
