@@ -72,10 +72,7 @@ impl Volume {
                 id,
                 volume_path.display()
             );
-            return Err(Error::volume(error::VolumeError::create(
-                id,
-                "already exists",
-            )));
+            return Err(boxed_volume_create!(id, "exists"));
         }
         if index_path.exists() {
             log::error!(
@@ -83,10 +80,7 @@ impl Volume {
                 id,
                 index_path.display()
             );
-            return Err(Error::index(error::IndexError::create(
-                id,
-                "already exists",
-            )));
+            return Err(boxed_index_create!(id, "exists"));
         }
         let (index_file, index_map, _) = Self::open_indexes(index_path, true)?;
         let (readonly_file, writable_file) = Self::open_volumes(&volume_path, true)?;
@@ -95,7 +89,7 @@ impl Volume {
             id,
             volume_path: volume_path
                 .to_str()
-                .ok_or(format!("{:?} to string", volume_path))?
+                .ok_or(naive!("{:?} to string", volume_path))?
                 .to_owned(),
             writable_volume: writable_file,
             readonly_volume: readonly_file,
@@ -154,7 +148,7 @@ impl Volume {
             id,
             volume_path: volume_path
                 .to_str()
-                .ok_or(Error::naive(format!("{:?} to string", volume_path)))?
+                .ok_or(naive!("{:?} to string", volume_path))?
                 .to_owned(),
             writable_volume: writable_file,
             readonly_volume: readonly_file,

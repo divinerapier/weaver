@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::ops::Try;
 use std::path::{Path, PathBuf};
 
-use crate::error::{self, Error, Result};
+use crate::error::{Error, Result};
 use crate::needle::Needle;
 use crate::store::volume::Volume;
 use crate::utils::size::Size;
@@ -54,7 +54,8 @@ impl Directory {
                 let volume_ref: Result<&Volume> = result
                     .volumes
                     .get(index)
-                    .ok_or(Error::not_found(format!("volume: {}", index)));
+                    .ok_or(boxed_volume_not_found!(index));
+
                 let volume_ref = volume_ref?;
                 for (k, v) in &volume_ref.indexes {
                     result.needle_map.insert(k.to_owned(), index);
@@ -84,7 +85,7 @@ impl Directory {
         let volume: &mut Volume = self
             .volumes
             .get_mut(volume_id)
-            .ok_or(Error::volume(error::VolumeError::not_found(volume_id)))?;
+            .ok_or(boxed_volume_not_found!(volume_id))?;
         let path = path.into();
         volume.write_needle(&path, body)?;
         self.needle_map.insert(path.clone(), volume.id);
@@ -132,7 +133,7 @@ impl Directory {
         let volume: &mut Volume = self
             .volumes
             .get_mut(volume_id)
-            .ok_or(Error::volume(error::VolumeError::not_found(volume_id)))?;
+            .ok_or(boxed_volume_not_found!(volume_id))?;
         if volume.max_length - volume.current_length < length as u64 {
             log::warn!(
                 "volume almost full. max: {}, current: {}, todo: {}",
@@ -140,9 +141,7 @@ impl Directory {
                 volume.current_length,
                 length
             );
-            return Err(Error::retry(Error::directory(
-                error::DirectoryError::GetWritableVolume,
-            )));
+            return Err(boxed_no_writable_volumes!());
         }
         Ok(volume.id)
     }
@@ -152,17 +151,14 @@ impl Directory {
         K: Into<String>,
     {
         let key = key.into();
-        let volume_id = self
+        let volume_id = *self
             .needle_map
             .get(&key)
             .ok_or(Error::not_found(format!("path: {}", key)))?;
         let volume: &Volume = self
             .volumes
-            .get(*volume_id)
-            .ok_or(Error::not_found(format!(
-                "path: {}, got volume id: {}",
-                key, *volume_id
-            )))?;
+            .get(volume_id)
+            .ok_or(boxed_volume_not_found!(volume_id))?;
         Ok(volume.get(key)?)
     }
 
@@ -176,9 +172,9 @@ impl Directory {
         }
         let index = rand::thread_rng().gen::<i64>() as usize;
         let index = index % self.writable_volumes.len();
-        let volume_id = self.writable_volumes.iter().skip(index).next()?;
+        let volume_id = *self.writable_volumes.iter().skip(index).next()?;
         assert_eq!(length, self.writable_volumes.len());
-        Some(*volume_id)
+        Some(volume_id)
     }
 }
 
