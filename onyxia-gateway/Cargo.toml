@@ -13,7 +13,7 @@ actix-multipart = "0.1.2"
 actix-http = "0.2.8"
 bytes = "0.4.12"
 log = "0.4.8"
-futures = "0.1.28"
+futures = "0.1.29"
 env_logger = "0.6.2"
 failure = "0.1.5"
 libonyxia = {path = "../libonyxia", version = "0.1.0"}
