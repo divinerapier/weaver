@@ -47,6 +47,7 @@ macro_rules! boxed_volume_create {
     };
 }
 
+#[macro_export]
 macro_rules! boxed_index_create {
     ($arg:tt, $cause:tt) => {
         crate::error::Error::index(crate::error::IndexError::create($arg, $cause))

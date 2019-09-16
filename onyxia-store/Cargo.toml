@@ -20,3 +20,4 @@ env_logger = "0.6.2"
 log = "0.4.8"
 libonyxia = {path = "../libonyxia/", version = "0.1.0"}
 bytes = "0.4.12"
+md-5 = "0.8.0"

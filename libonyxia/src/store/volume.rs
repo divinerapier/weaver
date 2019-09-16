@@ -43,7 +43,7 @@ impl From<&OsStr> for VolumeExtension {
 
 #[derive(Serialize, Debug)]
 pub struct Volume {
-    pub id: usize,
+    pub id: u32,
     pub volume_path: String,
     #[serde(skip_serializing)]
     pub writable_volume: File,
@@ -53,7 +53,7 @@ pub struct Volume {
     pub max_length: u64,
     #[serde(skip_serializing)]
     pub index_file: File,
-    pub indexes: HashMap<String, RawIndex>,
+    pub indexes: HashMap<u64, RawIndex>,
 }
 
 impl Display for Volume {
@@ -63,7 +63,7 @@ impl Display for Volume {
 }
 
 impl Volume {
-    pub fn new(dir: &Path, id: usize, size: Size) -> Result<Volume> {
+    pub fn new(dir: &Path, id: u32, size: Size) -> Result<Volume> {
         let volume_path: PathBuf = dir.join(format!("{}.data", id));
         let index_path: PathBuf = dir.join(format!("{}.index", id));
         if volume_path.exists() {
@@ -159,7 +159,7 @@ impl Volume {
         })
     }
 
-    fn parse_volume_file_stem_name(volume_path: &Path) -> Result<usize> {
+    fn parse_volume_file_stem_name(volume_path: &Path) -> Result<u32> {
         let file_stem = volume_path
             .file_stem()
             .ok_or(Error::path(format!("get file_stem from {:?}", volume_path)))?;
@@ -168,7 +168,7 @@ impl Volume {
             "&str",
             format!("{:?}", file_stem),
         ))?;
-        let id = file_stem_str.parse::<usize>()?;
+        let id = file_stem_str.parse::<u32>()?;
         Ok(id)
     }
 
@@ -217,7 +217,7 @@ impl Volume {
     fn open_indexes<P: AsRef<Path>>(
         filepath: P,
         new: bool,
-    ) -> Result<(File, HashMap<String, RawIndex>, RawIndex)> {
+    ) -> Result<(File, HashMap<u64, RawIndex>, RawIndex)> {
         let index_file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -232,7 +232,7 @@ impl Volume {
         if new {
             return Ok((index_file, index_map, RawIndex::default()));
         }
-        let volume_id: usize = Self::parse_volume_file_stem_name(filepath.as_ref())?;
+        let volume_id: u32 = Self::parse_volume_file_stem_name(filepath.as_ref())?;
         let mut readonly_index_file = index_file.try_clone()?;
         readonly_index_file.seek(SeekFrom::Start(0))?;
         let reader = std::io::BufReader::new(readonly_index_file);
@@ -242,7 +242,7 @@ impl Volume {
             let index: Index = index_result?;
             let raw_index = RawIndex::new(volume_id, index.offset, index.length);
             last_index = raw_index;
-            index_map.insert(index.path, raw_index);
+            index_map.insert(index.needle_id, raw_index);
         }
 
         Ok((index_file, index_map, last_index))
@@ -256,7 +256,7 @@ impl Volume {
         return length_after_write <= self.max_length;
     }
 
-    pub fn write_needle(&mut self, path: &str, needle: Needle) -> Result<()> {
+    pub fn write_needle(&mut self, needle_id: u64, needle: Needle) -> Result<()> {
         let length = needle.total_length() as usize;
         if !self.can_write(length as u64) {
             log::error!(
@@ -297,7 +297,7 @@ impl Volume {
             );
             return Err(Error::volume(error::VolumeError::write_length_mismatch(
                 self.id,
-                path,
+                needle_id.to_string(),
                 length,
                 received_length,
             )));
@@ -306,44 +306,38 @@ impl Volume {
         // write index
         // TODO: supports write-ahead log
 
-        let index = Index::new(
-            path.to_owned(),
-            self.id,
-            self.current_length as usize,
-            length,
-        );
+        let index = Index::new(needle_id, self.id, self.current_length as usize, length);
         self.index_file
             .write_all(serde_json::to_string(&index)?.as_bytes())?;
         self.current_length += length as u64;
         self.indexes.insert(
-            path.to_owned(),
+            needle_id,
             RawIndex::new(index.volume_id, index.offset, index.length),
         );
         Ok(())
     }
 
-    pub fn get<K>(&self, path: K) -> Result<Needle>
-    where
-        K: Into<String> + Display,
-    {
-        let path = path.into();
+    pub fn get(&self, needle_id: u64) -> Result<Needle> {
         let index: RawIndex = self
             .indexes
-            .get(&path)
+            .get(&needle_id)
             .ok_or(Error::not_found(format!(
-                "not in indexes: {}, indexes: {:?}",
-                path, self.indexes
+                "needle not in indexes: {}, indexes: {:?}",
+                needle_id, self.indexes
             )))?
             .clone();
         if ((index.offset + index.length) as u64) > self.current_length {
             log::error!(
-                "volume data corruption. path: {}, volume_length: {}, index.offset: {}, index.length: {}",
-                path,
+                "volume data corruption. needle: {}, volume_length: {}, index.offset: {}, index.length: {}",
+                needle_id,
                 self.current_length,
                 index.offset,
                 index.length
             );
-            return Err(Error::data_corruption(path, "index out of current length"));
+            return Err(Error::data_corruption(
+                needle_id.to_string(),
+                "index out of current length",
+            ));
         }
         Ok(self.read_needle(&index)?)
     }
@@ -440,9 +434,9 @@ mod test {
         let mut file: File = tempfile::tempfile().unwrap();
 
         let indexes: Vec<Index> = vec![
-            Index::new("/tmp/file1".to_owned(), 1, 0, 10),
-            Index::new("/tmp/file2".to_owned(), 1, 10, 20),
-            Index::new("/tmp/file3".to_owned(), 1, 20, 30),
+            Index::new(0, 1, 0, 10),
+            Index::new(1, 1, 10, 20),
+            Index::new(2, 1, 20, 30),
         ];
 
         for index in &indexes {

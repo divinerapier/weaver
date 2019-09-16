@@ -3,10 +3,12 @@ use std::sync::mpsc;
 
 mod directory_error;
 mod index_error;
+mod needle_error;
 mod volume_error;
 
 pub use directory_error::DirectoryError;
 pub use index_error::IndexError;
+pub use needle_error::NeedleError;
 pub use volume_error::VolumeError;
 
 pub enum Error {
@@ -30,7 +32,7 @@ pub enum Error {
     Volume(VolumeError),
     Directory(DirectoryError),
     Index(IndexError),
-    Retriable(Box<Error>),
+    Needle(NeedleError),
 }
 
 impl std::fmt::Display for Error {
@@ -54,7 +56,7 @@ impl std::fmt::Display for Error {
             Volume(e) => write!(f, "Volume. {}", e),
             Directory(e) => write!(f, "Directory. {}", e),
             Index(e) => write!(f, "Index. {}", e),
-            Retriable(e) => write!(f, "Retriable. {}", e),
+            Needle(e) => write!(f, "Needle. {}", e),
         }
     }
 }
@@ -80,7 +82,7 @@ impl std::fmt::Debug for Error {
             Volume(e) => write!(f, "Volume. {}", e),
             Directory(e) => write!(f, "Directory. {}", e),
             Index(e) => write!(f, "Index. {}", e),
-            Retriable(e) => write!(f, "Retriable. {}", e),
+            Needle(e) => write!(f, "Needle. {}", e),
         }
     }
 }
@@ -156,18 +158,6 @@ impl Error {
 
     pub fn index(ie: IndexError) -> Box<Error> {
         Error::Index(ie).into()
-    }
-
-    pub fn retry(e: Box<Error>) -> Box<Error> {
-        Error::Retriable(e).into()
-    }
-
-    // validator
-    pub fn is_retriable(&self) -> bool {
-        if let Error::Retriable(_) = self {
-            return true;
-        }
-        false
     }
 }
 // Box the error in case of large data structure when there is no error.

@@ -2,8 +2,10 @@ use std::sync::mpsc::Receiver;
 
 use byteorder::ByteOrder;
 use bytes::Bytes;
+use futures::stream::{self, Stream};
+use futures::{Async, Poll};
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 pub struct Needle {
     pub header: NeedleHeader,
@@ -90,6 +92,54 @@ impl Iterator for NeedleIterator {
                 Some(Ok(data.clone()))
             }
             NeedleBody::MultiParts(receiver) => receiver.recv().ok(),
+        }
+    }
+}
+
+pub struct NeedleStream {
+    iter: NeedleIterator,
+}
+
+impl From<Needle> for NeedleStream {
+    fn from(n: Needle) -> NeedleStream {
+        NeedleStream {
+            iter: n.into_iter(),
+        }
+    }
+}
+
+impl Stream for NeedleStream {
+    type Item = bytes::Bytes;
+    type Error = Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        // if self.reading_finished {
+        //     return Ok(Async::Ready(None));
+        // }
+        // if !self.reading_started {
+        //     self.reading_started = true;
+        //     return Ok(Async::Ready(Some(self.needle.header.as_bytes())));
+        // }
+        // match &self.needle.body {
+        //     NeedleBody::SinglePart(data) => {
+        //         self.reading_finished = true;
+        //         Ok(Async::Ready(Some(data.clone())))
+        //     }
+        //     NeedleBody::MultiParts(receiver) => match receiver.recv().ok() {
+        //         Some(data) => match data {
+        //             Ok(data) => Ok(Async::Ready(Some(data))),
+        //             Err(err) => Err(*err),
+        //         },
+
+        //         None => Ok(Async::Ready(None)),
+        //     },
+        // }
+        match self.iter.next() {
+            Some(data) => match data {
+                Ok(data) => Ok(Async::Ready(Some(data))),
+                Err(e) => Err(*e),
+            },
+            None => Ok(Async::Ready(None)),
         }
     }
 }

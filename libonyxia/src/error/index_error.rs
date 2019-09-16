@@ -3,11 +3,11 @@ use failure::Fail;
 #[derive(Debug, Fail)]
 pub enum IndexError {
     #[fail(display = "Create. index: {}, cause: {}", index, cause)]
-    Create { index: usize, cause: String },
+    Create { index: u32, cause: String },
 }
 
 impl IndexError {
-    pub fn create<C>(index: usize, cause: C) -> IndexError
+    pub fn create<C>(index: u32, cause: C) -> IndexError
     where
         C: Into<String>,
     {

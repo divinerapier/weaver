@@ -1,16 +1,16 @@
 #[allow(dead_code)]
-#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+#[derive(Copy, Clone, serde::Serialize, serde::Deserialize, Debug, PartialEq)]
 pub struct Index {
-    pub path: String,
-    pub volume_id: usize,
+    pub needle_id: u64,
+    pub volume_id: u32,
     pub offset: usize,
     pub length: usize,
 }
 
 impl Index {
-    pub fn new(path: String, volume_id: usize, offset: usize, length: usize) -> Index {
+    pub fn new(needle_id: u64, volume_id: u32, offset: usize, length: usize) -> Index {
         Index {
-            path,
+            needle_id,
             volume_id,
             offset,
             length,
@@ -20,21 +20,25 @@ impl Index {
 
 #[derive(Copy, Clone, Debug, serde::Serialize)]
 pub struct RawIndex {
-    pub volume_id: usize,
+    pub volume_id: u32,
     pub offset: usize,
     pub length: usize,
 }
 
 impl RawIndex {
-    pub fn new(volume_id: usize, offset: usize, length: usize) -> RawIndex {
-        RawIndex { volume_id,offset, length }
+    pub fn new(volume_id: u32, offset: usize, length: usize) -> RawIndex {
+        RawIndex {
+            volume_id,
+            offset,
+            length,
+        }
     }
 }
 
 impl Default for RawIndex {
     fn default() -> RawIndex {
         RawIndex {
-            volume_id:0,
+            volume_id: 0,
             offset: 0,
             length: 0,
         }

@@ -8,6 +8,7 @@ pub mod error;
 pub mod file;
 pub mod index;
 pub mod needle;
+pub mod server;
 pub mod store;
 pub mod utils;
 

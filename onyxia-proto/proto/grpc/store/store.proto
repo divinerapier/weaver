@@ -3,38 +3,39 @@ syntax = "proto3";
 // common status
 
 message CommonStatus {
-    int32 status_code = 1;
-    string message = 2;
-  }
-  
-  // message for directory service
-  
-  message WriteFileRequest {
-    string path = 1;
-    int64 offset = 2;
-    int64 length = 3;
-    bytes data = 4;
-  }
-  
-  message WriteFileResponse { CommonStatus status = 1; }
-  
-  message ReadFileRequest {
-    string path = 1;
-    int64 offset = 2;
-    int64 length = 3;
-  }
-  
-  message ReadFileResponse {
-    CommonStatus status = 1;
-    string path = 2;
-    int64 offset = 3;
-    int64 length = 4;
-    bytes data = 5;
-  }
-  
-  // rpc services
-  
-  service Store {
-    rpc WriteFile(stream WriteFileRequest) returns (WriteFileResponse) {};
-    rpc ReadFile(ReadFileRequest) returns (stream ReadFileResponse) {};
-  }
+     int32 status_code = 1;
+    string message     = 2;
+}
+
+// message for directory service
+
+message WriteNeedleRequest {
+    uint32 volume_id = 1;
+    uint64 needle_id = 2;
+    int64  offset    = 3;
+    int64  length    = 4;
+    bytes  data      = 5;
+}
+
+message WriteNeedleResponse { CommonStatus status = 1; }
+
+message ReadNeedleRequest {
+    uint32 volume_id = 1;
+    uint64 needle_id = 2;
+}
+
+message ReadNeedleResponse {
+    CommonStatus status    = 1;
+          uint32 volume_id = 2;
+          uint64 needle_id = 3;
+           int64 offset    = 4;
+           int64 length    = 5;
+           bytes data      = 6;
+}
+
+// rpc services
+
+service Store {
+    rpc WriteNeedle(stream WriteNeedleRequest) returns (WriteNeedleResponse) {};
+    rpc ReadNeedle(ReadNeedleRequest) returns (stream ReadNeedleResponse) {};
+}

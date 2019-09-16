@@ -1,8 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::Metadata;
 use std::path::{Path, PathBuf};
 
 use crate::error::Result;
+use crate::needle::Needle;
 use crate::store::volume::Volume;
 use crate::utils::size::Size;
 
@@ -16,9 +17,6 @@ pub struct Store {
     // TODO: use a min-heap to store volumes? tuple(id, remain_length)
     pub writable_volumes: HashSet<usize>,
     pub readonly_volumes: HashSet<usize>,
-
-    /// map from file path to volume index in self.volumes
-    pub needle_map: HashMap<String, usize>,
 }
 
 impl Store {
@@ -67,7 +65,15 @@ impl Store {
             volumes,
             writable_volumes: HashSet::new(),
             readonly_volumes: HashSet::new(),
-            needle_map: HashMap::new(),
         })
+    }
+
+    pub fn read_needle(&self, volume_id: u32, needle_id: u64) -> Result<Needle> {
+        if volume_id as usize >= self.volumes.len() {
+            // FIXME: index out of range
+            return Err(boxed_naive!("volume not found"));
+        }
+        let volume: &Volume = &self.volumes[volume_id as usize];
+        volume.get(needle_id)
     }
 }
