@@ -356,17 +356,17 @@ impl Volume {
     pub fn read_needle(&self, index: &RawIndex) -> Result<Needle> {
         let mut readonly_volume = self.readonly_volume.try_clone()?;
         let needle_header = Self::read_needle_header(&mut readonly_volume, index.offset)?;
-        if needle_header.body_length as usize != index.length - 4 {
+        if needle_header.size as usize != index.length - 4 {
             log::error!(
                 "length from index: {}, length from needle header: {}",
                 index.length,
-                needle_header.body_length
+                needle_header.size
             );
         }
-        let batch_size = if needle_header.body_length > 1024 * 1024 {
+        let batch_size = if needle_header.size > 1024 * 1024 {
             1024 * 1024 // 1M
         } else {
-            needle_header.body_length as usize
+            needle_header.size as usize
         };
         readonly_volume.seek(std::io::SeekFrom::Start(index.offset as u64 + 4))?;
         let mut buffer = Vec::with_capacity(batch_size);
