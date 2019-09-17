@@ -67,6 +67,14 @@ impl Directory {
         Ok(result)
     }
 
+    pub fn read(&self, volume_id: u32, needle_id: u64) -> Result<Needle> {
+        let volume: &Volume = self
+            .volumes
+            .get(volume_id as usize)
+            .ok_or(boxed_volume_not_found!(volume_id))?;
+        Ok(volume.get(needle_id)?)
+    }
+
     /// write appends the body to any available volume and
     /// then records the offset and body size to index file
     pub fn write(&mut self, needle_id: u64, body: Needle) -> Result<()> {
@@ -143,31 +151,14 @@ impl Directory {
         Ok(volume.id)
     }
 
-    // pub fn read<K>(&self, key: K) -> Result<Needle>
-    // where
-    //     K: Into<String>,
-    // {
-    //     let key = key.into();
-    //     let volume_id = *self
-    //         .needle_map
-    //         .get(&key)
-    //         .ok_or(Error::not_found(format!("path: {}", key)))?;
-    //     let volume: &Volume = self
-    //         .volumes
-    //         .get(volume_id)
-    //         .ok_or(boxed_volume_not_found!(volume_id))?;
-    //     Ok(volume.get(key)?)
-    // }
-
     // Notice: this is not randomly, different from golang
     // I have no idea about how to test it
     fn random_writable_volume(&self) -> Option<u32> {
-        use rand::Rng;
         let length = self.writable_volumes.len();
         if length == 0 {
             return None;
         }
-        let index = rand::thread_rng().gen::<i64>() as usize;
+        let index = srand::ThreadLocal::uint64() as usize;
         let index = index % self.writable_volumes.len();
         let volume_id = *self.writable_volumes.iter().skip(index).next()?;
         assert_eq!(length, self.writable_volumes.len());
@@ -204,131 +195,115 @@ mod test {
         std::fs::remove_dir_all(testdata_dir.as_path()).unwrap();
         std::fs::create_dir_all(testdata_dir.as_path()).unwrap();
         let mut directory = Directory::new(testdata_dir.as_path(), Size::byte(100)).unwrap();
-        let data1 = bytes::Bytes::from("data1: hello world data1\n");
-        let data2 = bytes::Bytes::from("data2: hello world data2\n");
-        let data3 = bytes::Bytes::from("data3: hello world data3\n");
-        let data4 = bytes::Bytes::from("data4: hello world data4\n");
-        let data5 = bytes::Bytes::from("data5: hello world data5\n");
-        let data6 = bytes::Bytes::from("data6: hello world data6\n");
-        let data7_1 = bytes::Bytes::from("data7_1: hello world data7_1\n");
-        let data7_2 = bytes::Bytes::from("data7_2: hello world data7_2\n");
-        let data7_3 = bytes::Bytes::from("data7_3: hello world data7_3\n");
+        let data: Vec<bytes::Bytes> = vec![
+            bytes::Bytes::from("data1: hello world data1\n"),
+            bytes::Bytes::from("data2: hello world data2\n"),
+            bytes::Bytes::from("data3: hello world data3\n"),
+            bytes::Bytes::from("data4: hello world data4\n"),
+            bytes::Bytes::from("data5: hello world data5\n"),
+            bytes::Bytes::from("data6: hello world data6\n"),
+            bytes::Bytes::from("data7_1: hello world data7_1\n"),
+            bytes::Bytes::from("data7_2: hello world data7_2\n"),
+            bytes::Bytes::from("data7_3: hello world data7_3\n"),
+            bytes::Bytes::from("sd8_1\n"),
+            bytes::Bytes::from("sd8_2\n"),
+            bytes::Bytes::from("sd8_3\n"),
+            bytes::Bytes::from("sd8_4\n"),
+            bytes::Bytes::from("sd8_5\n"),
+        ];
         // write
         {
-            {
-                log::debug!("test1",);
-                let needle = Needle {
-                    header: NeedleHeader {
-                        size: data1.len() as u32,
-                        ..NeedleHeader::default()
-                    },
-                    body: NeedleBody::SinglePart(data1),
-                };
-                directory.write(0, needle).unwrap();
+            for i in 0..6 {
+                log::debug!("test{}", i);
+                let needle = Needle::new(
+                    NeedleHeader::new(i as u64, data[i as usize].len() as u32),
+                    NeedleBody::SinglePart(data[i].clone()),
+                    8,
+                );
+                directory.write(i as u64, needle).unwrap();
             }
-            {
-                log::debug!("test2",);
-                let needle = Needle {
-                    header: NeedleHeader {
-                        size: data2.len() as u32,
-                        ..NeedleHeader::default()
-                    },
-                    body: NeedleBody::SinglePart(data2),
-                };
-                directory.write(1, needle).unwrap();
-            }
-            {
-                log::debug!("test3",);
-                let needle = Needle {
-                    header: NeedleHeader {
-                        size: data3.len() as u32,
-                        ..NeedleHeader::default()
-                    },
-                    body: NeedleBody::SinglePart(data3),
-                };
-                directory.write(2, needle).unwrap();
-            }
-            {
-                log::debug!("test4",);
-                let needle = Needle {
-                    header: NeedleHeader {
-                        size: data4.len() as u32,
-                        ..NeedleHeader::default()
-                    },
-                    body: NeedleBody::SinglePart(data4),
-                };
-                directory.write(3, needle).unwrap();
-            }
-            {
-                log::debug!("test5",);
-                let needle = Needle {
-                    header: NeedleHeader {
-                        size: data5.len() as u32,
-                        ..NeedleHeader::default()
-                    },
-                    body: NeedleBody::SinglePart(data5),
-                };
-                directory.write(4, needle).unwrap();
-            }
+
+            // FIXME: space of writable volume is not enough
             {
                 log::debug!("test6",);
-                let needle = Needle {
-                    header: NeedleHeader {
-                        size: data6.len() as u32,
-                        ..NeedleHeader::default()
-                    },
-                    body: NeedleBody::SinglePart(data6),
-                };
-                directory.write(5, needle).unwrap();
+                let (tx, rx) = std::sync::mpsc::channel();
+                let length = data[6].len() + data[7].len() + data[8].len();
+                let cloned_data = data.clone();
+                std::thread::spawn(move || {
+                    tx.send(Ok(cloned_data[6].clone())).unwrap();
+                    tx.send(Ok(cloned_data[7].clone())).unwrap();
+                    tx.send(Ok(cloned_data[8].clone())).unwrap();
+                });
+                let needle = Needle::new(
+                    NeedleHeader::new(6, length as u32),
+                    NeedleBody::MultiParts(rx),
+                    8,
+                );
+                directory.write(6, needle).unwrap();
             }
-            // FIXME: space of writable volume is not enough
-            // {
-            //     log::debug!("test7",);
-            //     let (tx, rx) = std::sync::mpsc::channel();
-            //     let length = data7_1.len() + data7_2.len() + data7_3.len();
-            //     std::thread::spawn(move || {
-            //         tx.send(Ok(data7_1)).unwrap();
-            //         tx.send(Ok(data7_2)).unwrap();
-            //         tx.send(Ok(data7_3)).unwrap();
-            //     });
-            //     let needle = Needle {
-            //         header: NeedleHeader {
-            //             size: length as u32,
-            //             ..NeedleHeader::default()
-            //         },
-            //         body: NeedleBody::MultiParts(rx),
-            //     };
-            //     directory.write(6, needle).unwrap();
-            // }
+            {
+                for i in 9..14 {
+                    log::debug!("test{}", i);
+                    let needle = Needle::new(
+                        NeedleHeader::new(i, data[i as usize].len() as u32),
+                        NeedleBody::SinglePart(data[i as usize].clone()),
+                        8,
+                    );
+                    directory.write(i as u64, needle).unwrap();
+                }
+            }
         }
         // read
-        // {
-        //     let needle1 = directory.read("/path/to/file/1").unwrap();
-        //     check_needle_body(needle1, "data1: hello world data1\n");
-        //     let needle2 = directory.read("/path/to/file/2").unwrap();
-        //     check_needle_body(needle2, "data2: hello world data2\n");
-        //     let needle3 = directory.read("/path/to/file/3").unwrap();
-        //     check_needle_body(needle3, "data3: hello world data3\n");
-        //     let needle4 = directory.read("/path/to/file/4").unwrap();
-        //     check_needle_body(needle4, "data4: hello world data4\n");
-        //     let needle5 = directory.read("/path/to/file/5").unwrap();
-        //     check_needle_body(needle5, "data5: hello world data5\n");
-        //     let needle6 = directory.read("/path/to/file/6").unwrap();
-        //     check_needle_body(needle6, "data6: hello world data6\n");
-        //     let needle7 = directory.read("/path/to/file/7").unwrap();
-        //     check_needle_body(needle7, "data7_1: hello world data7_1\ndata7_2: hello world data7_2\ndata7_3: hello world data7_3\n");
-        // }
+        {
+            for i in 0..6 {
+                let needle1 = directory.read(i, i as u64).unwrap();
+                check_needle_body(needle1, unsafe {
+                    &String::from_utf8_unchecked((data[i as usize].as_ref().to_vec()))
+                });
+            }
+
+            let needle1 = directory.read(6, 6).unwrap();
+            check_needle_body(needle1, unsafe {
+                let mut expect = data[6].clone().as_ref().to_vec();
+                expect.append(&mut { data[7].clone().as_ref().to_vec() });
+                expect.append(&mut { data[8].clone().as_ref().to_vec() });
+                &String::from_utf8_unchecked(expect)
+            });
+
+            let needle1 = directory.read(7, 9).unwrap();
+            check_needle_body(needle1, unsafe {
+                &String::from_utf8_unchecked((data[9].as_ref().to_vec()))
+            });
+            // unpredictable behavior
+            // let needle1 = directory.read(7, 10).unwrap();
+            // check_needle_body(needle1, unsafe {
+            //     &String::from_utf8_unchecked((data[10].as_ref().to_vec()))
+            // });
+        }
     }
 
     fn check_needle_body(needle: Needle, data: &str) {
         assert_eq!(needle.body_length() as usize, data.len());
+        let mut v = vec![];
         match needle.body {
             NeedleBody::SinglePart(body) => {
                 assert_eq!(body.len(), data.len());
+                log::debug!("body: {:?}", body.as_ref());
+                log::debug!("data: {:?}", data.as_bytes());
                 assert_eq!(body.as_ref(), data.as_bytes());
             }
             // TODO: test read multiparts
-            NeedleBody::MultiParts(_body_chain) => {}
+            NeedleBody::MultiParts(_body_chain) => {
+                for data in _body_chain {
+                    let data: bytes::Bytes = data.unwrap();
+                    let data: &[u8] = data.as_ref();
+                    v.append(&mut data.to_vec());
+                }
+                assert_eq!(v.len(), data.len());
+                log::debug!("body: {:?}", v);
+                log::debug!("data: {:?}", data.as_bytes());
+                assert_eq!(v, data.as_bytes());
+            }
         }
     }
 

@@ -248,31 +248,34 @@ impl Volume {
         Ok((index_file, index_map, last_index))
     }
 
-    fn can_write(&self, length: u64) -> bool {
-        if self.readonly() {
-            return false;
-        }
-        let length_after_write = self.current_length + length;
-        return length_after_write <= self.max_length;
+    fn can_write(&self, _length: u64) -> bool {
+        return self.writable();
+        // if self.readonly() {
+        //     return false;
+        // }
+        // let length_after_write = self.current_length + length;
+        // return length_after_write <= self.max_length;
     }
 
     pub fn write_needle(&mut self, needle_id: u64, needle: Needle) -> Result<()> {
-        let length = needle.total_length() as usize;
-        if !self.can_write(length as u64) {
+        let actual_data_length = needle.actual_length() as usize;
+        let total_length = needle.total_length() as usize;
+        if !self.can_write(total_length as u64) {
             log::error!(
-                "couldn't write to the volume. id: {}, path: {}, writable: {}, max_length: {}, current_length: {}, todo: {}",
+                "couldn't write to the volume. id: {}, path: {}, writable: {}, max_length: {}, current_length: {}, actual_data_length: {}, total_length: {}",
                 self.id,
                 self.volume_path,
                 self.writable(),
                 self.max_length,
                 self.current_length,
-               length
+               actual_data_length,
+               total_length
             );
             return Err(Error::volume(error::VolumeError::overflow(
                 self.id,
                 self.max_length,
                 self.current_length,
-                length as u64,
+                total_length as u64,
             )));
         }
         let mut received_length = 0usize;
@@ -289,16 +292,19 @@ impl Volume {
             writer.write_all(data.as_ref())?;
         }
 
-        if received_length != length {
+        writer.flush()?;
+
+        if received_length != actual_data_length {
             log::error!(
-                "mismatched needle length. received: {}, announced: {}",
+                "mismatched needle length. received: {}, actual: {}, total: {}",
                 received_length,
-                length
+                actual_data_length,
+                total_length,
             );
             return Err(Error::volume(error::VolumeError::write_length_mismatch(
                 self.id,
                 needle_id.to_string(),
-                length,
+                actual_data_length,
                 received_length,
             )));
         }
@@ -306,10 +312,16 @@ impl Volume {
         // write index
         // TODO: supports write-ahead log
 
-        let index = Index::new(needle_id, self.id, self.current_length as usize, length);
+        let index = Index::new(
+            needle_id,
+            self.id,
+            self.current_length as usize,
+            total_length,
+        );
         self.index_file
             .write_all(serde_json::to_string(&index)?.as_bytes())?;
-        self.current_length += length as u64;
+        self.current_length += total_length as u64;
+        self.writable_volume.set_len(self.current_length)?;
         self.indexes.insert(
             needle_id,
             RawIndex::new(index.volume_id, index.offset, index.length),
@@ -326,6 +338,7 @@ impl Volume {
                 needle_id, self.indexes
             )))?
             .clone();
+        log::debug!("index: {:?}", index);
         if ((index.offset + index.length) as u64) > self.current_length {
             log::error!(
                 "volume data corruption. needle: {}, volume_length: {}, index.offset: {}, index.length: {}",
@@ -343,8 +356,8 @@ impl Volume {
     }
 
     pub fn read_needle_header(file: &mut File, offset: usize) -> Result<NeedleHeader> {
-        let mut buffer = Vec::with_capacity(4);
-        buffer.resize(4, 0 as u8);
+        let mut buffer = Vec::with_capacity(26);
+        buffer.resize(26, 0);
         file.seek(std::io::SeekFrom::Start(offset as u64))?;
         file.read_exact(&mut buffer)?;
         // automatically provides the implementation of [`Into`]
@@ -356,32 +369,30 @@ impl Volume {
     pub fn read_needle(&self, index: &RawIndex) -> Result<Needle> {
         let mut readonly_volume = self.readonly_volume.try_clone()?;
         let needle_header = Self::read_needle_header(&mut readonly_volume, index.offset)?;
-        if needle_header.size as usize != index.length - 4 {
-            log::error!(
-                "length from index: {}, length from needle header: {}",
-                index.length,
-                needle_header.size
-            );
-        }
-        let batch_size = if needle_header.size > 1024 * 1024 {
+        log::debug!("header: {:?}", needle_header);
+        let body_size = needle_header.body_length();
+        let batch_size = if body_size > 1024 * 1024 {
             1024 * 1024 // 1M
         } else {
-            needle_header.size as usize
+            body_size as usize
         };
-        readonly_volume.seek(std::io::SeekFrom::Start(index.offset as u64 + 4))?;
+        readonly_volume.seek(std::io::SeekFrom::Start(
+            index.offset as u64 + needle_header.length() as u64,
+        ))?;
         let mut buffer = Vec::with_capacity(batch_size);
         buffer.resize(batch_size, 0 as u8);
         let mut readonly_volume = self.readonly_volume.try_clone()?;
-        if index.length <= 1024 * 1024 {
+        if index.length <= 8 {
             readonly_volume.read_exact(&mut buffer)?;
-            return Ok(Needle {
-                header: needle_header,
-                body: NeedleBody::SinglePart(bytes::Bytes::from(buffer)),
-            });
+            return Ok(Needle::new(
+                needle_header,
+                NeedleBody::SinglePart(bytes::Bytes::from(buffer)),
+                8,
+            ));
         }
         // TODO: using thread pool
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
-        let mut remains = index.length;
+        let mut remains = body_size;
         std::thread::spawn(move || {
             while remains > 0 {
                 let current = match readonly_volume.read(&mut buffer) {
@@ -390,23 +401,25 @@ impl Volume {
                         // NOTE: This function will never panic, but it may return [`Err`]
                         // if the [`Receiver`] has disconnected and is no longer able to
                         // receive information.
+                        log::error!("failed to read from volume. error: {:?}", e);
                         match tx.send(Err(Error::io(e))) {
                             Ok(_) => {}
                             Err(send_error) => {
-                                println!("failed to send error into channel. {:?}", send_error);
+                                log::error!("failed to send error into channel. {:?}", send_error);
                             }
                         }
                         return;
                     }
                 };
-                remains -= current;
+                remains -= current as u32;
                 match tx.send(Ok(bytes::Bytes::from(&buffer[0..current]))) {
                     Ok(_) => {}
                     Err(e) => {
+                        log::error!("failed to read from volume. error: {:?}", e);
                         match tx.send(Err(Error::channel(e.description()))) {
                             Ok(_) => {}
                             Err(send_error) => {
-                                println!("failed to send error into channel. {:?}", send_error);
+                                log::error!("failed to send error into channel. {:?}", send_error);
                             }
                         }
                         return;
@@ -414,10 +427,8 @@ impl Volume {
                 }
             }
         });
-        Ok(Needle {
-            header: needle_header,
-            body: NeedleBody::MultiParts(rx),
-        })
+        // TODO: read needle footer
+        Ok(Needle::new(needle_header, NeedleBody::MultiParts(rx), 8))
     }
 }
 
