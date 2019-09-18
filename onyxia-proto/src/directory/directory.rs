@@ -775,9 +775,8 @@ impl ::protobuf::reflect::ProtobufValue for AssignRequest {
 #[derive(PartialEq,Clone,Default)]
 pub struct AssignResponse {
     // message fields
-    pub master: ::std::string::String,
-    pub slaves: ::protobuf::RepeatedField<::std::string::String>,
-    pub file_id: ::std::string::String,
+    pub master: ::protobuf::SingularPtrField<Replica>,
+    pub slaves: ::protobuf::RepeatedField<Replica>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -794,36 +793,43 @@ impl AssignResponse {
         ::std::default::Default::default()
     }
 
-    // string master = 1;
+    // .Replica master = 1;
 
 
-    pub fn get_master(&self) -> &str {
-        &self.master
+    pub fn get_master(&self) -> &Replica {
+        self.master.as_ref().unwrap_or_else(|| Replica::default_instance())
     }
     pub fn clear_master(&mut self) {
         self.master.clear();
     }
 
+    pub fn has_master(&self) -> bool {
+        self.master.is_some()
+    }
+
     // Param is passed by value, moved
-    pub fn set_master(&mut self, v: ::std::string::String) {
-        self.master = v;
+    pub fn set_master(&mut self, v: Replica) {
+        self.master = ::protobuf::SingularPtrField::some(v);
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_master(&mut self) -> &mut ::std::string::String {
-        &mut self.master
+    pub fn mut_master(&mut self) -> &mut Replica {
+        if self.master.is_none() {
+            self.master.set_default();
+        }
+        self.master.as_mut().unwrap()
     }
 
     // Take field
-    pub fn take_master(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.master, ::std::string::String::new())
+    pub fn take_master(&mut self) -> Replica {
+        self.master.take().unwrap_or_else(|| Replica::new())
     }
 
-    // repeated string slaves = 2;
+    // repeated .Replica slaves = 2;
 
 
-    pub fn get_slaves(&self) -> &[::std::string::String] {
+    pub fn get_slaves(&self) -> &[Replica] {
         &self.slaves
     }
     pub fn clear_slaves(&mut self) {
@@ -831,49 +837,33 @@ impl AssignResponse {
     }
 
     // Param is passed by value, moved
-    pub fn set_slaves(&mut self, v: ::protobuf::RepeatedField<::std::string::String>) {
+    pub fn set_slaves(&mut self, v: ::protobuf::RepeatedField<Replica>) {
         self.slaves = v;
     }
 
     // Mutable pointer to the field.
-    pub fn mut_slaves(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+    pub fn mut_slaves(&mut self) -> &mut ::protobuf::RepeatedField<Replica> {
         &mut self.slaves
     }
 
     // Take field
-    pub fn take_slaves(&mut self) -> ::protobuf::RepeatedField<::std::string::String> {
+    pub fn take_slaves(&mut self) -> ::protobuf::RepeatedField<Replica> {
         ::std::mem::replace(&mut self.slaves, ::protobuf::RepeatedField::new())
-    }
-
-    // string file_id = 3;
-
-
-    pub fn get_file_id(&self) -> &str {
-        &self.file_id
-    }
-    pub fn clear_file_id(&mut self) {
-        self.file_id.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_file_id(&mut self, v: ::std::string::String) {
-        self.file_id = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_file_id(&mut self) -> &mut ::std::string::String {
-        &mut self.file_id
-    }
-
-    // Take field
-    pub fn take_file_id(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.file_id, ::std::string::String::new())
     }
 }
 
 impl ::protobuf::Message for AssignResponse {
     fn is_initialized(&self) -> bool {
+        for v in &self.master {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
+        for v in &self.slaves {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
         true
     }
 
@@ -882,13 +872,10 @@ impl ::protobuf::Message for AssignResponse {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.master)?;
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.master)?;
                 },
                 2 => {
-                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.slaves)?;
-                },
-                3 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.file_id)?;
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.slaves)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -902,30 +889,30 @@ impl ::protobuf::Message for AssignResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if !self.master.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.master);
+        if let Some(ref v) = self.master.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         }
         for value in &self.slaves {
-            my_size += ::protobuf::rt::string_size(2, &value);
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        if !self.file_id.is_empty() {
-            my_size += ::protobuf::rt::string_size(3, &self.file_id);
-        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if !self.master.is_empty() {
-            os.write_string(1, &self.master)?;
+        if let Some(ref v) = self.master.as_ref() {
+            os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         }
         for v in &self.slaves {
-            os.write_string(2, &v)?;
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        if !self.file_id.is_empty() {
-            os.write_string(3, &self.file_id)?;
-        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -968,20 +955,15 @@ impl ::protobuf::Message for AssignResponse {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Replica>>(
                     "master",
                     |m: &AssignResponse| { &m.master },
                     |m: &mut AssignResponse| { &mut m.master },
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Replica>>(
                     "slaves",
                     |m: &AssignResponse| { &m.slaves },
                     |m: &mut AssignResponse| { &mut m.slaves },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "file_id",
-                    |m: &AssignResponse| { &m.file_id },
-                    |m: &mut AssignResponse| { &mut m.file_id },
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<AssignResponse>(
                     "AssignResponse",
@@ -1007,7 +989,6 @@ impl ::protobuf::Clear for AssignResponse {
     fn clear(&mut self) {
         self.master.clear();
         self.slaves.clear();
-        self.file_id.clear();
         self.unknown_fields.clear();
     }
 }
@@ -1019,6 +1000,210 @@ impl ::std::fmt::Debug for AssignResponse {
 }
 
 impl ::protobuf::reflect::ProtobufValue for AssignResponse {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct Replica {
+    // message fields
+    pub location: ::std::string::String,
+    pub volume_id: u32,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a Replica {
+    fn default() -> &'a Replica {
+        <Replica as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl Replica {
+    pub fn new() -> Replica {
+        ::std::default::Default::default()
+    }
+
+    // string location = 1;
+
+
+    pub fn get_location(&self) -> &str {
+        &self.location
+    }
+    pub fn clear_location(&mut self) {
+        self.location.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_location(&mut self, v: ::std::string::String) {
+        self.location = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_location(&mut self) -> &mut ::std::string::String {
+        &mut self.location
+    }
+
+    // Take field
+    pub fn take_location(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.location, ::std::string::String::new())
+    }
+
+    // uint32 volume_id = 2;
+
+
+    pub fn get_volume_id(&self) -> u32 {
+        self.volume_id
+    }
+    pub fn clear_volume_id(&mut self) {
+        self.volume_id = 0;
+    }
+
+    // Param is passed by value, moved
+    pub fn set_volume_id(&mut self, v: u32) {
+        self.volume_id = v;
+    }
+}
+
+impl ::protobuf::Message for Replica {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.location)?;
+                },
+                2 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_uint32()?;
+                    self.volume_id = tmp;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if !self.location.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.location);
+        }
+        if self.volume_id != 0 {
+            my_size += ::protobuf::rt::value_size(2, self.volume_id, ::protobuf::wire_format::WireTypeVarint);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if !self.location.is_empty() {
+            os.write_string(1, &self.location)?;
+        }
+        if self.volume_id != 0 {
+            os.write_uint32(2, self.volume_id)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &dyn (::std::any::Any) {
+        self as &dyn (::std::any::Any)
+    }
+    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
+        self as &mut dyn (::std::any::Any)
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> Replica {
+        Replica::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "location",
+                    |m: &Replica| { &m.location },
+                    |m: &mut Replica| { &mut m.location },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
+                    "volume_id",
+                    |m: &Replica| { &m.volume_id },
+                    |m: &mut Replica| { &mut m.volume_id },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new::<Replica>(
+                    "Replica",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static Replica {
+        static mut instance: ::protobuf::lazy::Lazy<Replica> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const Replica,
+        };
+        unsafe {
+            instance.get(Replica::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for Replica {
+    fn clear(&mut self) {
+        self.location.clear();
+        self.volume_id = 0;
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for Replica {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Replica {
     fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
         ::protobuf::reflect::ProtobufValueRef::Message(self)
     }
@@ -1691,91 +1876,96 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x04body\x18\x02\x20\x01(\x0cR\x04body\"I\n\x0cCommonStatus\x12\x1f\n\
     \x0bstatus_code\x18\x01\x20\x01(\x05R\nstatusCode\x12\x18\n\x07message\
     \x18\x02\x20\x01(\tR\x07message\"<\n\rAssignRequest\x12+\n\x11replicatio\
-    n_count\x18\x01\x20\x01(\x05R\x10replicationCount\"Y\n\x0eAssignResponse\
-    \x12\x16\n\x06master\x18\x01\x20\x01(\tR\x06master\x12\x16\n\x06slaves\
-    \x18\x02\x20\x03(\tR\x06slaves\x12\x17\n\x07file_id\x18\x03\x20\x01(\tR\
-    \x06fileId\"F\n\x10KeepaliveRequest\x12\x1a\n\x08location\x18\x01\x20\
-    \x01(\tR\x08location\x12\x16\n\x06status\x18\x02\x20\x01(\x03R\x06status\
-    \"\x13\n\x11KeepaliveResponse\"X\n\x1dRegisterStorageServiceRequest\x12\
-    \x1a\n\x08location\x18\x01\x20\x01(\tR\x08location\x12\x1b\n\tvolume_id\
-    \x18\x02\x20\x01(\x03R\x08volumeId\"\x20\n\x1eRegisterStorageServiceResp\
-    onse2h\n\x10ExampleDirectory\x12T\n\tWriteFile\x12!.ExampleDirectoryWrit\
-    eFileRequest\x1a\".ExampleDirectoryWriteFileResponse\"\02\xcf\x01\n\tDir\
-    ectory\x12+\n\x06Assign\x12\x0e.AssignRequest\x1a\x0f.AssignResponse\"\0\
-    \x128\n\tKeepalive\x12\x11.KeepaliveRequest\x1a\x12.KeepaliveResponse\"\
-    \0(\x010\x01\x12[\n\x16RegisterStorageService\x12\x1e.RegisterStorageSer\
-    viceRequest\x1a\x1f.RegisterStorageServiceResponse(\x01J\xf3\x0b\n\x06\
-    \x12\x04\0\06\x01\n\x08\n\x01\x0c\x12\x03\0\0\x12\n!\n\x02\x04\0\x12\x03\
-    \x04\0=2\x16\x20message\x20for\x20examples\n\n\n\n\x03\x04\0\x01\x12\x03\
-    \x04\x08(\n\x0b\n\x04\x04\0\x02\0\x12\x03\x04+;\n\x0c\n\x05\x04\0\x02\0\
-    \x04\x12\x03\x04+*\n\x0c\n\x05\x04\0\x02\0\x05\x12\x03\x04+1\n\x0c\n\x05\
-    \x04\0\x02\0\x01\x12\x03\x0426\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\x049:\
-    \n\n\n\x02\x04\x01\x12\x04\x06\0\t\x01\n\n\n\x03\x04\x01\x01\x12\x03\x06\
-    \x08)\n\x0b\n\x04\x04\x01\x02\0\x12\x03\x07\x02\x12\n\r\n\x05\x04\x01\
-    \x02\0\x04\x12\x04\x07\x02\x06+\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\
-    \x07\x02\x08\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\x07\t\r\n\x0c\n\x05\
-    \x04\x01\x02\0\x03\x12\x03\x07\x10\x11\n\x0b\n\x04\x04\x01\x02\x01\x12\
-    \x03\x08\x02\x11\n\r\n\x05\x04\x01\x02\x01\x04\x12\x04\x08\x02\x07\x12\n\
-    \x0c\n\x05\x04\x01\x02\x01\x05\x12\x03\x08\x02\x07\n\x0c\n\x05\x04\x01\
-    \x02\x01\x01\x12\x03\x08\x08\x0c\n\x0c\n\x05\x04\x01\x02\x01\x03\x12\x03\
-    \x08\x0f\x10\n\n\n\x02\x06\0\x12\x04\x0b\0\x0e\x01\n\n\n\x03\x06\0\x01\
-    \x12\x03\x0b\x08\x18\n\x0c\n\x04\x06\0\x02\0\x12\x04\x0c\x02\r4\n\x0c\n\
-    \x05\x06\0\x02\0\x01\x12\x03\x0c\x06\x0f\n\x0c\n\x05\x06\0\x02\0\x02\x12\
-    \x03\x0c\x100\n\x0c\n\x05\x06\0\x02\0\x03\x12\x03\r\x0f0\n\x1b\n\x02\x04\
-    \x02\x12\x04\x12\0\x15\x012\x0f\x20common\x20status\n\n\n\n\x03\x04\x02\
-    \x01\x12\x03\x12\x08\x14\n\x0b\n\x04\x04\x02\x02\0\x12\x03\x13\x02\x18\n\
-    \r\n\x05\x04\x02\x02\0\x04\x12\x04\x13\x02\x12\x16\n\x0c\n\x05\x04\x02\
-    \x02\0\x05\x12\x03\x13\x02\x07\n\x0c\n\x05\x04\x02\x02\0\x01\x12\x03\x13\
-    \x08\x13\n\x0c\n\x05\x04\x02\x02\0\x03\x12\x03\x13\x16\x17\n\x0b\n\x04\
-    \x04\x02\x02\x01\x12\x03\x14\x02\x15\n\r\n\x05\x04\x02\x02\x01\x04\x12\
-    \x04\x14\x02\x13\x18\n\x0c\n\x05\x04\x02\x02\x01\x05\x12\x03\x14\x02\x08\
-    \n\x0c\n\x05\x04\x02\x02\x01\x01\x12\x03\x14\t\x10\n\x0c\n\x05\x04\x02\
-    \x02\x01\x03\x12\x03\x14\x13\x14\n*\n\x02\x04\x03\x12\x03\x19\062\x1f\
-    \x20message\x20for\x20directory\x20service\n\n\n\n\x03\x04\x03\x01\x12\
-    \x03\x19\x08\x15\n\x0b\n\x04\x04\x03\x02\0\x12\x03\x19\x184\n\x0c\n\x05\
-    \x04\x03\x02\0\x04\x12\x03\x19\x18\x17\n\x0c\n\x05\x04\x03\x02\0\x05\x12\
-    \x03\x19\x18\x1d\n\x0c\n\x05\x04\x03\x02\0\x01\x12\x03\x19\x1e/\n\x0c\n\
-    \x05\x04\x03\x02\0\x03\x12\x03\x1923\n\n\n\x02\x04\x04\x12\x04\x1b\0\x1f\
-    \x01\n\n\n\x03\x04\x04\x01\x12\x03\x1b\x08\x16\n\x0b\n\x04\x04\x04\x02\0\
-    \x12\x03\x1c\x02\x14\n\r\n\x05\x04\x04\x02\0\x04\x12\x04\x1c\x02\x1b\x18\
-    \n\x0c\n\x05\x04\x04\x02\0\x05\x12\x03\x1c\x02\x08\n\x0c\n\x05\x04\x04\
-    \x02\0\x01\x12\x03\x1c\t\x0f\n\x0c\n\x05\x04\x04\x02\0\x03\x12\x03\x1c\
-    \x12\x13\n\x0b\n\x04\x04\x04\x02\x01\x12\x03\x1d\x02\x1d\n\x0c\n\x05\x04\
-    \x04\x02\x01\x04\x12\x03\x1d\x02\n\n\x0c\n\x05\x04\x04\x02\x01\x05\x12\
-    \x03\x1d\x0b\x11\n\x0c\n\x05\x04\x04\x02\x01\x01\x12\x03\x1d\x12\x18\n\
-    \x0c\n\x05\x04\x04\x02\x01\x03\x12\x03\x1d\x1b\x1c\n\x0b\n\x04\x04\x04\
-    \x02\x02\x12\x03\x1e\x02\x15\n\r\n\x05\x04\x04\x02\x02\x04\x12\x04\x1e\
-    \x02\x1d\x1d\n\x0c\n\x05\x04\x04\x02\x02\x05\x12\x03\x1e\x02\x08\n\x0c\n\
-    \x05\x04\x04\x02\x02\x01\x12\x03\x1e\t\x10\n\x0c\n\x05\x04\x04\x02\x02\
-    \x03\x12\x03\x1e\x13\x14\n\n\n\x02\x04\x05\x12\x04!\0$\x01\n\n\n\x03\x04\
-    \x05\x01\x12\x03!\x08\x18\n\x0b\n\x04\x04\x05\x02\0\x12\x03\"\x02\x16\n\
-    \r\n\x05\x04\x05\x02\0\x04\x12\x04\"\x02!\x1a\n\x0c\n\x05\x04\x05\x02\0\
-    \x05\x12\x03\"\x02\x08\n\x0c\n\x05\x04\x05\x02\0\x01\x12\x03\"\t\x11\n\
-    \x0c\n\x05\x04\x05\x02\0\x03\x12\x03\"\x14\x15\n\x0b\n\x04\x04\x05\x02\
-    \x01\x12\x03#\x02\x13\n\r\n\x05\x04\x05\x02\x01\x04\x12\x04#\x02\"\x16\n\
-    \x0c\n\x05\x04\x05\x02\x01\x05\x12\x03#\x02\x07\n\x0c\n\x05\x04\x05\x02\
-    \x01\x01\x12\x03#\x08\x0e\n\x0c\n\x05\x04\x05\x02\x01\x03\x12\x03#\x11\
-    \x12\n\t\n\x02\x04\x06\x12\x03&\0\x1c\n\n\n\x03\x04\x06\x01\x12\x03&\x08\
-    \x19\n\n\n\x02\x04\x07\x12\x04(\0+\x01\n\n\n\x03\x04\x07\x01\x12\x03(\
-    \x08%\n\x0b\n\x04\x04\x07\x02\0\x12\x03)\x02\x16\n\r\n\x05\x04\x07\x02\0\
-    \x04\x12\x04)\x02('\n\x0c\n\x05\x04\x07\x02\0\x05\x12\x03)\x02\x08\n\x0c\
-    \n\x05\x04\x07\x02\0\x01\x12\x03)\t\x11\n\x0c\n\x05\x04\x07\x02\0\x03\
-    \x12\x03)\x14\x15\n\x0b\n\x04\x04\x07\x02\x01\x12\x03*\x02\x17\n\r\n\x05\
-    \x04\x07\x02\x01\x04\x12\x04*\x02)\x16\n\x0c\n\x05\x04\x07\x02\x01\x05\
-    \x12\x03*\x02\x07\n\x0c\n\x05\x04\x07\x02\x01\x01\x12\x03*\t\x12\n\x0c\n\
-    \x05\x04\x07\x02\x01\x03\x12\x03*\x15\x16\n\n\n\x02\x04\x08\x12\x04-\0/\
-    \x01\n\n\n\x03\x04\x08\x01\x12\x03-\x08&\n\n\n\x02\x06\x01\x12\x042\06\
-    \x01\n\n\n\x03\x06\x01\x01\x12\x032\x08\x11\n\x0b\n\x04\x06\x01\x02\0\
-    \x12\x033\x027\n\x0c\n\x05\x06\x01\x02\0\x01\x12\x033\x06\x0c\n\x0c\n\
-    \x05\x06\x01\x02\0\x02\x12\x033\r\x1a\n\x0c\n\x05\x06\x01\x02\0\x03\x12\
-    \x033%3\n\x0b\n\x04\x06\x01\x02\x01\x12\x034\x02N\n\x0c\n\x05\x06\x01\
-    \x02\x01\x01\x12\x034\x06\x0f\n\x0c\n\x05\x06\x01\x02\x01\x05\x12\x034\
-    \x10\x16\n\x0c\n\x05\x06\x01\x02\x01\x02\x12\x034\x17'\n\x0c\n\x05\x06\
-    \x01\x02\x01\x06\x12\x03428\n\x0c\n\x05\x06\x01\x02\x01\x03\x12\x0349J\n\
-    \x0b\n\x04\x06\x01\x02\x02\x12\x035\x02l\n\x0c\n\x05\x06\x01\x02\x02\x01\
-    \x12\x035\x06\x1c\n\x0c\n\x05\x06\x01\x02\x02\x05\x12\x035\x1d#\n\x0c\n\
-    \x05\x06\x01\x02\x02\x02\x12\x035$A\n\x0c\n\x05\x06\x01\x02\x02\x03\x12\
-    \x035Ljb\x06proto3\
+    n_count\x18\x01\x20\x01(\x05R\x10replicationCount\"T\n\x0eAssignResponse\
+    \x12\x20\n\x06master\x18\x01\x20\x01(\x0b2\x08.ReplicaR\x06master\x12\
+    \x20\n\x06slaves\x18\x02\x20\x03(\x0b2\x08.ReplicaR\x06slaves\"B\n\x07Re\
+    plica\x12\x1a\n\x08location\x18\x01\x20\x01(\tR\x08location\x12\x1b\n\tv\
+    olume_id\x18\x02\x20\x01(\rR\x08volumeId\"F\n\x10KeepaliveRequest\x12\
+    \x1a\n\x08location\x18\x01\x20\x01(\tR\x08location\x12\x16\n\x06status\
+    \x18\x02\x20\x01(\x03R\x06status\"\x13\n\x11KeepaliveResponse\"X\n\x1dRe\
+    gisterStorageServiceRequest\x12\x1a\n\x08location\x18\x01\x20\x01(\tR\
+    \x08location\x12\x1b\n\tvolume_id\x18\x02\x20\x01(\x03R\x08volumeId\"\
+    \x20\n\x1eRegisterStorageServiceResponse2h\n\x10ExampleDirectory\x12T\n\
+    \tWriteFile\x12!.ExampleDirectoryWriteFileRequest\x1a\".ExampleDirectory\
+    WriteFileResponse\"\02\xcf\x01\n\tDirectory\x12+\n\x06Assign\x12\x0e.Ass\
+    ignRequest\x1a\x0f.AssignResponse\"\0\x128\n\tKeepalive\x12\x11.Keepaliv\
+    eRequest\x1a\x12.KeepaliveResponse\"\0(\x010\x01\x12[\n\x16RegisterStora\
+    geService\x12\x1e.RegisterStorageServiceRequest\x1a\x1f.RegisterStorageS\
+    erviceResponse(\x01J\xd1\x0c\n\x06\x12\x04\0\0:\x01\n\x08\n\x01\x0c\x12\
+    \x03\0\0\x12\n!\n\x02\x04\0\x12\x03\x04\0=2\x16\x20message\x20for\x20exa\
+    mples\n\n\n\n\x03\x04\0\x01\x12\x03\x04\x08(\n\x0b\n\x04\x04\0\x02\0\x12\
+    \x03\x04+;\n\x0c\n\x05\x04\0\x02\0\x04\x12\x03\x04+*\n\x0c\n\x05\x04\0\
+    \x02\0\x05\x12\x03\x04+1\n\x0c\n\x05\x04\0\x02\0\x01\x12\x03\x0426\n\x0c\
+    \n\x05\x04\0\x02\0\x03\x12\x03\x049:\n\n\n\x02\x04\x01\x12\x04\x06\0\t\
+    \x01\n\n\n\x03\x04\x01\x01\x12\x03\x06\x08)\n\x0b\n\x04\x04\x01\x02\0\
+    \x12\x03\x07\x02\x12\n\r\n\x05\x04\x01\x02\0\x04\x12\x04\x07\x02\x06+\n\
+    \x0c\n\x05\x04\x01\x02\0\x05\x12\x03\x07\x02\x08\n\x0c\n\x05\x04\x01\x02\
+    \0\x01\x12\x03\x07\t\r\n\x0c\n\x05\x04\x01\x02\0\x03\x12\x03\x07\x10\x11\
+    \n\x0b\n\x04\x04\x01\x02\x01\x12\x03\x08\x02\x11\n\r\n\x05\x04\x01\x02\
+    \x01\x04\x12\x04\x08\x02\x07\x12\n\x0c\n\x05\x04\x01\x02\x01\x05\x12\x03\
+    \x08\x02\x07\n\x0c\n\x05\x04\x01\x02\x01\x01\x12\x03\x08\x08\x0c\n\x0c\n\
+    \x05\x04\x01\x02\x01\x03\x12\x03\x08\x0f\x10\n\n\n\x02\x06\0\x12\x04\x0b\
+    \0\x0e\x01\n\n\n\x03\x06\0\x01\x12\x03\x0b\x08\x18\n\x0c\n\x04\x06\0\x02\
+    \0\x12\x04\x0c\x02\r4\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03\x0c\x06\x0f\n\
+    \x0c\n\x05\x06\0\x02\0\x02\x12\x03\x0c\x100\n\x0c\n\x05\x06\0\x02\0\x03\
+    \x12\x03\r\x0f0\n\x1b\n\x02\x04\x02\x12\x04\x12\0\x15\x012\x0f\x20common\
+    \x20status\n\n\n\n\x03\x04\x02\x01\x12\x03\x12\x08\x14\n\x0b\n\x04\x04\
+    \x02\x02\0\x12\x03\x13\x02\x18\n\r\n\x05\x04\x02\x02\0\x04\x12\x04\x13\
+    \x02\x12\x16\n\x0c\n\x05\x04\x02\x02\0\x05\x12\x03\x13\x02\x07\n\x0c\n\
+    \x05\x04\x02\x02\0\x01\x12\x03\x13\x08\x13\n\x0c\n\x05\x04\x02\x02\0\x03\
+    \x12\x03\x13\x16\x17\n\x0b\n\x04\x04\x02\x02\x01\x12\x03\x14\x02\x15\n\r\
+    \n\x05\x04\x02\x02\x01\x04\x12\x04\x14\x02\x13\x18\n\x0c\n\x05\x04\x02\
+    \x02\x01\x05\x12\x03\x14\x02\x08\n\x0c\n\x05\x04\x02\x02\x01\x01\x12\x03\
+    \x14\t\x10\n\x0c\n\x05\x04\x02\x02\x01\x03\x12\x03\x14\x13\x14\n*\n\x02\
+    \x04\x03\x12\x03\x19\062\x1f\x20message\x20for\x20directory\x20service\n\
+    \n\n\n\x03\x04\x03\x01\x12\x03\x19\x08\x15\n\x0b\n\x04\x04\x03\x02\0\x12\
+    \x03\x19\x184\n\x0c\n\x05\x04\x03\x02\0\x04\x12\x03\x19\x18\x17\n\x0c\n\
+    \x05\x04\x03\x02\0\x05\x12\x03\x19\x18\x1d\n\x0c\n\x05\x04\x03\x02\0\x01\
+    \x12\x03\x19\x1e/\n\x0c\n\x05\x04\x03\x02\0\x03\x12\x03\x1923\n\n\n\x02\
+    \x04\x04\x12\x04\x1b\0\x1e\x01\n\n\n\x03\x04\x04\x01\x12\x03\x1b\x08\x16\
+    \n\x0b\n\x04\x04\x04\x02\0\x12\x03\x1c\x0b\x1f\n\r\n\x05\x04\x04\x02\0\
+    \x04\x12\x04\x1c\x0b\x1b\x18\n\x0c\n\x05\x04\x04\x02\0\x06\x12\x03\x1c\
+    \x0b\x12\n\x0c\n\x05\x04\x04\x02\0\x01\x12\x03\x1c\x13\x19\n\x0c\n\x05\
+    \x04\x04\x02\0\x03\x12\x03\x1c\x1d\x1e\n\x0b\n\x04\x04\x04\x02\x01\x12\
+    \x03\x1d\x02\x1f\n\x0c\n\x05\x04\x04\x02\x01\x04\x12\x03\x1d\x02\n\n\x0c\
+    \n\x05\x04\x04\x02\x01\x06\x12\x03\x1d\x0b\x12\n\x0c\n\x05\x04\x04\x02\
+    \x01\x01\x12\x03\x1d\x13\x19\n\x0c\n\x05\x04\x04\x02\x01\x03\x12\x03\x1d\
+    \x1d\x1e\n\n\n\x02\x04\x05\x12\x04\x20\0#\x01\n\n\n\x03\x04\x05\x01\x12\
+    \x03\x20\x08\x0f\n\x0b\n\x04\x04\x05\x02\0\x12\x03!\x04\x18\n\r\n\x05\
+    \x04\x05\x02\0\x04\x12\x04!\x04\x20\x11\n\x0c\n\x05\x04\x05\x02\0\x05\
+    \x12\x03!\x04\n\n\x0c\n\x05\x04\x05\x02\0\x01\x12\x03!\x0b\x13\n\x0c\n\
+    \x05\x04\x05\x02\0\x03\x12\x03!\x16\x17\n\x0b\n\x04\x04\x05\x02\x01\x12\
+    \x03\"\x04\x19\n\r\n\x05\x04\x05\x02\x01\x04\x12\x04\"\x04!\x18\n\x0c\n\
+    \x05\x04\x05\x02\x01\x05\x12\x03\"\x04\n\n\x0c\n\x05\x04\x05\x02\x01\x01\
+    \x12\x03\"\x0b\x14\n\x0c\n\x05\x04\x05\x02\x01\x03\x12\x03\"\x17\x18\n\n\
+    \n\x02\x04\x06\x12\x04%\0(\x01\n\n\n\x03\x04\x06\x01\x12\x03%\x08\x18\n\
+    \x0b\n\x04\x04\x06\x02\0\x12\x03&\x02\x16\n\r\n\x05\x04\x06\x02\0\x04\
+    \x12\x04&\x02%\x1a\n\x0c\n\x05\x04\x06\x02\0\x05\x12\x03&\x02\x08\n\x0c\
+    \n\x05\x04\x06\x02\0\x01\x12\x03&\t\x11\n\x0c\n\x05\x04\x06\x02\0\x03\
+    \x12\x03&\x14\x15\n\x0b\n\x04\x04\x06\x02\x01\x12\x03'\x02\x13\n\r\n\x05\
+    \x04\x06\x02\x01\x04\x12\x04'\x02&\x16\n\x0c\n\x05\x04\x06\x02\x01\x05\
+    \x12\x03'\x02\x07\n\x0c\n\x05\x04\x06\x02\x01\x01\x12\x03'\x08\x0e\n\x0c\
+    \n\x05\x04\x06\x02\x01\x03\x12\x03'\x11\x12\n\t\n\x02\x04\x07\x12\x03*\0\
+    \x1c\n\n\n\x03\x04\x07\x01\x12\x03*\x08\x19\n\n\n\x02\x04\x08\x12\x04,\0\
+    /\x01\n\n\n\x03\x04\x08\x01\x12\x03,\x08%\n\x0b\n\x04\x04\x08\x02\0\x12\
+    \x03-\x02\x16\n\r\n\x05\x04\x08\x02\0\x04\x12\x04-\x02,'\n\x0c\n\x05\x04\
+    \x08\x02\0\x05\x12\x03-\x02\x08\n\x0c\n\x05\x04\x08\x02\0\x01\x12\x03-\t\
+    \x11\n\x0c\n\x05\x04\x08\x02\0\x03\x12\x03-\x14\x15\n\x0b\n\x04\x04\x08\
+    \x02\x01\x12\x03.\x02\x17\n\r\n\x05\x04\x08\x02\x01\x04\x12\x04.\x02-\
+    \x16\n\x0c\n\x05\x04\x08\x02\x01\x05\x12\x03.\x02\x07\n\x0c\n\x05\x04\
+    \x08\x02\x01\x01\x12\x03.\t\x12\n\x0c\n\x05\x04\x08\x02\x01\x03\x12\x03.\
+    \x15\x16\n\n\n\x02\x04\t\x12\x041\03\x01\n\n\n\x03\x04\t\x01\x12\x031\
+    \x08&\n\n\n\x02\x06\x01\x12\x046\0:\x01\n\n\n\x03\x06\x01\x01\x12\x036\
+    \x08\x11\n\x0b\n\x04\x06\x01\x02\0\x12\x037\x027\n\x0c\n\x05\x06\x01\x02\
+    \0\x01\x12\x037\x06\x0c\n\x0c\n\x05\x06\x01\x02\0\x02\x12\x037\r\x1a\n\
+    \x0c\n\x05\x06\x01\x02\0\x03\x12\x037%3\n\x0b\n\x04\x06\x01\x02\x01\x12\
+    \x038\x02N\n\x0c\n\x05\x06\x01\x02\x01\x01\x12\x038\x06\x0f\n\x0c\n\x05\
+    \x06\x01\x02\x01\x05\x12\x038\x10\x16\n\x0c\n\x05\x06\x01\x02\x01\x02\
+    \x12\x038\x17'\n\x0c\n\x05\x06\x01\x02\x01\x06\x12\x03828\n\x0c\n\x05\
+    \x06\x01\x02\x01\x03\x12\x0389J\n\x0b\n\x04\x06\x01\x02\x02\x12\x039\x02\
+    l\n\x0c\n\x05\x06\x01\x02\x02\x01\x12\x039\x06\x1c\n\x0c\n\x05\x06\x01\
+    \x02\x02\x05\x12\x039\x1d#\n\x0c\n\x05\x06\x01\x02\x02\x02\x12\x039$A\n\
+    \x0c\n\x05\x06\x01\x02\x02\x03\x12\x039Ljb\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

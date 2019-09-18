@@ -1,2 +1,2 @@
-pub mod directory;
 pub mod directory_grpc;
+pub mod directory;

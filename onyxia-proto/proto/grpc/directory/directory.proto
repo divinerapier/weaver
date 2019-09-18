@@ -26,9 +26,13 @@ message CommonStatus {
 message AssignRequest { int32 replication_count = 1; }
 
 message AssignResponse {
-  string master = 1;
-  repeated string slaves = 2;
-  string file_id = 3;
+           Replica master  = 1;
+  repeated Replica slaves  = 2;
+}
+
+message Replica {
+    string location = 1;
+    uint32 volume_id = 2;
 }
 
 message KeepaliveRequest {
