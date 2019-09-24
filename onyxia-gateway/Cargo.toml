@@ -14,6 +14,6 @@ actix-http = "0.2.8"
 bytes = "0.4.12"
 log = "0.4.8"
 futures = "0.1.28"
-env_logger = "0.6.2"
+env_logger = "0.7.0"
 failure = "0.1.5"
 libonyxia = {path = "../libonyxia", version = "0.1.0"}
