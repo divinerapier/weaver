@@ -1,17 +1,13 @@
-use onyxia_proto::store::store_grpc;
-
 mod client;
 mod server;
 
-fn main() {
-    run();
-}
-
-fn run() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     log::set_max_level(log::LevelFilter::max());
-    let service = store_grpc::create_store(server::StoreService::new("/data/onyxia/"));
-    libonyxia::server::Server::new(service).serve("127.0.0.1", 50_051);
+    let svc = onyxia_proto::store::server::StoreServer::new(server::StoreService::new("/data/onyxia/"));
+    tonic::transport::Server::builder().serve("127.0.0.1:50051".parse().unwrap(), svc).await?;
+    Ok(())
 }
 
 // #[cfg(test)]

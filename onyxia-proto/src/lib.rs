@@ -1,7 +1,6 @@
-#[allow(dead_code)]
-#[allow(unknown_lints)]
-#[allow(clippy::all)]
-#[allow(renamed_and_removed_lints)]
-#[allow(bare_trait_objects)]
-pub mod directory;
-pub mod store;
+pub mod directory {
+    tonic::include_proto!("directory");
+}
+pub mod store {
+    tonic::include_proto!("store");
+}

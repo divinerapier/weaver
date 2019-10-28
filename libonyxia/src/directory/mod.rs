@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::ops::Try;
 use std::path::{Path, PathBuf};
 
 use crate::error::Result;
@@ -121,20 +120,17 @@ impl Directory {
     }
 
     fn try_get_writable_volume(&mut self, length: usize) -> Result<u32> {
-        let volume_id =
-            self.random_writable_volume()
-                .into_result()
-                .or_else(|_| -> Result<u32> {
-                    let volume = Volume::new(
-                        &self.volumes_dir,
-                        self.volumes.len() as u32,
-                        self.volume_size,
-                    )?;
-                    let volume_id = volume.id;
-                    self.volumes.push(volume);
-                    self.writable_volumes.insert(volume_id);
-                    Ok(volume_id)
-                })?;
+        let volume_id = self.random_writable_volume().or_else(|_| -> Result<u32> {
+            let volume = Volume::new(
+                &self.volumes_dir,
+                self.volumes.len() as u32,
+                self.volume_size,
+            )?;
+            let volume_id = volume.id;
+            self.volumes.push(volume);
+            self.writable_volumes.insert(volume_id);
+            Ok(volume_id)
+        })?;
         let volume: &mut Volume = self
             .volumes
             .get_mut(volume_id as usize)
@@ -153,16 +149,18 @@ impl Directory {
 
     // Notice: this is not randomly, different from golang
     // I have no idea about how to test it
-    fn random_writable_volume(&self) -> Option<u32> {
+    fn random_writable_volume(&self) -> Result<u32> {
         let length = self.writable_volumes.len();
         if length == 0 {
-            return None;
+            return Err(boxed_no_writable_volumes!());
         }
         let index = srand::ThreadLocal::uint64() as usize;
         let index = index % self.writable_volumes.len();
-        let volume_id = *self.writable_volumes.iter().skip(index).next()?;
         assert_eq!(length, self.writable_volumes.len());
-        Some(volume_id as u32)
+        match self.writable_volumes.iter().skip(index).next() {
+            Some(&volume_id) => Ok(volume_id),
+            None => Err(boxed_no_writable_volumes!()),
+        }
     }
 }
 

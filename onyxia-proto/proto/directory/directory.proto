@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package directory; // required by tonic library
+
 // message for examples
 
 message ExampleDirectoryWriteFileRequest { string path = 1; }

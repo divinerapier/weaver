@@ -1,14 +1,12 @@
-use onyxia_proto::directory::directory_grpc;
+use onyxia_proto::*;
 
 mod server;
 
-fn main() {
-    run();
-}
-
-fn run() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     log::set_max_level(log::LevelFilter::max());
-    let service = directory_grpc::create_directory(server::DirectoryService {});
-    libonyxia::server::Server::new(service).serve("127.0.0.1", 50_050);
+    let svc = onyxia_proto::directory::server::DirectoryServer::new(server::DirectoryService {});
+    tonic::transport::Server::builder().serve("127.0.0.1:50050".parse().unwrap(), svc).await?;
+    Ok(())
 }
