@@ -7,3 +7,20 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# local
+weaver-proto = {path = "../weaver-proto", version = "0.1.0"}
+weaver = {path = "../", version = "0.1.0"}
+
+# transport and protocol
+tonic = { version = "0.1.0-alpha.4", features = ["rustls"] }
+bytes = "0.4"
+prost = "0.5"
+tokio = "=0.2.0-alpha.6"
+futures-preview = { version = "=0.3.0-alpha.19", default-features = false, features = ["alloc"]}
+async-stream = "0.1.2"
+http = "0.1"
+tower = "=0.3.0-alpha.2"
+
+# logger
+env_logger = "0.6.2"
+log = "0.4.8"

@@ -56,6 +56,23 @@ pub struct Volume {
     pub indexes: HashMap<u64, RawIndex>,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ReplicaReplacement {
+    pub diff_data_centers: u8,
+    pub diff_rack: u8,
+    pub diff_node: u8,
+}
+
+impl ReplicaReplacement {
+    pub fn count(&self) -> usize {
+        self.diff_data_centers as usize * self.diff_node as usize * self.diff_rack as usize
+    }
+}
+
+pub struct SuperBlock {
+    pub replica_replacement: ReplicaReplacement,
+}
+
 impl Display for Volume {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self)

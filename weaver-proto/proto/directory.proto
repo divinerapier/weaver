@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package weaver.directory;
+
+import "weaver.proto";
+
+service Directory {
+
+  //
+  rpc LookupEntry(LookupEntryRequest) returns (LookupEntryResponse) {}
+
+  rpc ListEntries(ListEntriesRequest) returns (ListEntriesResponse) {}
+
+  rpc CreateEntry(CreateEntryRequest) returns (CreateEntryResponse) {}
+
+  rpc UpdateEntry(UpdateEntryRequest) returns (UpdateEntryResponse) {}
+
+  rpc DeleteEntry(DeleteEntryRequest) returns (DeleteEntryResponse) {}
+
+  rpc AssignVolume(AssignVolumeRequest) returns (AssignVolumeResponse) {}
+
+  rpc LookupVolume(LookupVolumeRequest) returns (LookupVolumeResponse) {}
+
+  rpc DeleteCollection(DeleteCollectionRequest)
+      returns (DeleteCollectionResponse) {}
+
+  rpc Statistics(StatisticsRequest) returns (StatisticsResponse) {}
+}
+
+// LookupEntryRequest is the type of message used to look up an entry
+// with a given directory and name.
+message LookupEntryRequest {
+  // lookup in
+  string directory = 1;
+
+  // name of entry
+  string name = 2;
+}
+
+message LookupEntryResponse {
+  weaver.Status status = 1;
+  Entry entry = 2;
+}
+
+message ListEntriesRequest {
+  string directory = 1;
+
+  // begin at
+  string offset = 2;
+  uint32 limit = 3;
+}
+
+message ListEntriesResponse {
+  weaver.Status status = 1;
+  repeated Entry entries = 2;
+  string next = 3;
+}
+
+message CreateEntryRequest {
+  string directory = 1;
+  Entry entry = 2;
+}
+
+message CreateEntryResponse {}
+
+message UpdateEntryRequest {
+  string directory = 1;
+  Entry entry = 2;
+}
+message UpdateEntryResponse {}
+
+message DeleteEntryRequest {
+  string directory = 1;
+  string name = 2;
+  // bool is_directory = 3;
+  bool is_delete_data = 4;
+  bool is_recursive = 5;
+  bool ignore_recursive_error = 6;
+}
+
+message DeleteEntryResponse {}
+
+message AtomicRenameEntryRequest {
+  string old_directory = 1;
+  string old_name = 2;
+  string new_directory = 3;
+  string new_name = 4;
+}
+
+message AtomicRenameEntryResponse {}
+
+message AssignVolumeRequest {
+  int32 count = 1;
+  string collection = 2;
+  ReplicaReplacement replica_replacement = 3;
+  int32 ttl_sec = 4;
+  string data_center = 5;
+}
+
+message AssignVolumeResponse {
+  string file_id = 1;
+  string url = 2;
+  string presigned_url = 3;
+  int32 count = 4;
+  string auth = 5;
+}
+
+message LookupVolumeRequest { repeated string volume_ids = 1; }
+
+message LookupVolumeResponse { map<string, Locations> locations_map = 1; }
+
+message DeleteCollectionRequest { string collection = 1; }
+
+message DeleteCollectionResponse {}
+
+message StatisticsRequest {
+  ReplicaReplacement replica_replacement = 1;
+  string collection = 2;
+  string ttl = 3;
+}
+
+message StatisticsResponse {
+  ReplicaReplacement replica_replacement = 1;
+  string collection = 2;
+  string ttl = 3;
+  uint64 total_size = 4;
+  uint64 used_size = 5;
+  uint64 file_count = 6;
+}

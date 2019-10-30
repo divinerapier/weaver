@@ -8,10 +8,10 @@ edition = "2018"
 
 [workspace]
 members = [
-    "weaver-directory",
-    "weaver-master",
     "weaver-proto",
-    "weaver-volume",
+    "weaver-master",
+    "weaver-directory",
+    "weaver-storage",
 ]
 
 [dependencies]
@@ -21,6 +21,9 @@ serde_json = "1.0.40"
 tempfile = "3.1.0"
 failure = "0.1.5"
 srand = "0.4.0"
+rand = "0.7.2"
+reservoir = "*"
+
 
 # local
 weaver-proto = {path = "weaver-proto", version = "0.1.0"}

@@ -6,6 +6,7 @@ pub mod directory2;
 pub mod error;
 pub mod index;
 pub mod needle;
+pub mod node;
 pub mod store;
 pub mod utils;
 
