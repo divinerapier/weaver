@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use weaver::error::Error;
 use weaver::needle::Needle;
-use weaver::storage::Store;
+use weaver::storage::Storage;
 
 use futures::{Stream, StreamExt};
 use tokio::sync::mpsc;
@@ -12,13 +12,13 @@ use tonic::{Request, Response, Status};
 // clone trait required by `fn create_directory`, so inner fields must be arc
 #[derive(Clone)]
 pub struct StorageService {
-    storage: Arc<RwLock<Store>>,
+    storage: Arc<RwLock<Storage>>,
 }
 
 impl StorageService {
-    pub fn new(dir: &str) -> StorageService {
+    pub fn new(dir: &str, ip: &str, port: u16) -> StorageService {
         StorageService {
-            storage: Arc::new(RwLock::new(Store::new(dir).unwrap())),
+            storage: Arc::new(RwLock::new(Storage::new(dir, ip, port).unwrap())),
         }
     }
 }

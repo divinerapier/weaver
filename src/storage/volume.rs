@@ -44,7 +44,7 @@ impl From<&OsStr> for VolumeExtension {
 #[derive(Serialize, Debug)]
 pub struct Volume {
     pub id: u32,
-    pub volume_path: String,
+    pub path: String,
     #[serde(skip_serializing)]
     pub writable_volume: File,
     #[serde(skip_serializing)]
@@ -104,7 +104,7 @@ impl Volume {
         let current_length = writable_file.metadata()?.len();
         Ok(Volume {
             id,
-            volume_path: volume_path
+            path: volume_path
                 .to_str()
                 .ok_or(naive!("{:?} to string", volume_path))?
                 .to_owned(),
@@ -163,7 +163,7 @@ impl Volume {
         }
         Ok(Volume {
             id,
-            volume_path: volume_path
+            path: volume_path
                 .to_str()
                 .ok_or(naive!("{:?} to string", volume_path))?
                 .to_owned(),
@@ -281,7 +281,7 @@ impl Volume {
             log::error!(
                 "couldn't write to the volume. id: {}, path: {}, writable: {}, max_length: {}, current_length: {}, actual_data_length: {}, total_length: {}",
                 self.id,
-                self.volume_path,
+                self.path,
                 self.writable(),
                 self.max_length,
                 self.current_length,

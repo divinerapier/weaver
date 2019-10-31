@@ -8,52 +8,61 @@ use volume::Volume;
 
 pub mod volume;
 
-/// Store consists of many volumes.
-pub struct Store {
-    pub volumes_dir: PathBuf,
+/// Storage consists of many volumes.
+pub struct Storage {
+    pub directory: PathBuf,
+
+    /// all volumes on storage
+    /// volume id -> volume
     pub volumes: HashMap<u64, Volume>,
 
-    // TODO: use a min-heap to store volumes? tuple(id, remain_length)
-    pub writable_volumes: HashSet<usize>,
-    pub readonly_volumes: HashSet<usize>,
+    /// public address
+    pub ip: String,
+    pub port: u16,
+
+    /// the max volume id of storage
+    pub latest_volume: u64,
+
+    pub writable_volumes: HashSet<u64>,
+    pub readonly_volumes: HashSet<u64>,
 }
 
-impl Store {
-    pub fn new(dir: &str) -> Result<Store> {
+impl Storage {
+    pub fn new(dir: &str, ip: &str, port: u16) -> Result<Storage> {
         let dir_result = std::fs::read_dir(dir)?;
+        let mut latest_volume = 0;
 
-        let mut index_files = vec![];
-
-        for entry in dir_result {
-            let entry: std::fs::DirEntry = entry?;
-            let metadata: Metadata = entry.metadata()?;
-            if !metadata.is_file() {
-                continue;
-            }
-            if metadata.permissions().readonly() {
-                log::warn!(
-                    "file in volume dir is readonly. {}/{}",
-                    dir,
-                    entry.file_name().to_str().unwrap(),
-                );
-                continue;
-            }
-            // filter data files and open them
-            // [`None`], if there is no file name;
-            // [`None`], if there is no embedded `.`;
-            // [`None`], if the file name begins with `.` and has no other `.`s within;
-            // Otherwise, the portion of the file name after the final `.`
-            if let Some(extension) = PathBuf::from(entry.file_name()).extension() {
-                if extension == "index" {
-                    // file_name, eg: 1.index
-                    index_files.push(entry.file_name());
+        let index_files = dir_result
+            .filter_map(|entry| {
+                let entry: std::fs::DirEntry = entry.ok()?;
+                let metadata = entry.metadata().ok()?;
+                if !metadata.is_file() || metadata.permissions().readonly() {
+                    log::warn!(
+                        "file in volume dir is readonly. {}/{}",
+                        dir,
+                        entry.file_name().to_str().unwrap()
+                    );
+                    None
                 } else {
-                    log::warn!("open store. skip entry: {:?}", entry);
+                    Some((entry, metadata))
                 }
-            } else {
-                log::error!("open store. skip entry: {:?}", entry);
-            }
-        }
+            })
+            .filter_map(|(entry, _)| {
+                if let Some(extension) = PathBuf::from(entry.file_name()).extension() {
+                    if extension == "index" {
+                        // file_name, eg: 1.index
+                        // index_files.push(entry.file_name());
+                        Some(entry.file_name())
+                    } else {
+                        log::warn!("open store. skip entry: {:?}", entry);
+                        None
+                    }
+                } else {
+                    log::error!("open store. skip entry: {:?}", entry);
+                    None
+                }
+            })
+            .collect::<Vec<std::ffi::OsString>>();
 
         let volumes = index_files
             .iter()
@@ -68,15 +77,21 @@ impl Store {
             })
             .map(|(index, index_file_name)| {
                 let volume_result = Volume::open(&Path::new(dir).join(index_file_name), 128);
+                if index > latest_volume {
+                    latest_volume = index;
+                }
                 (index, volume_result)
             })
-            .filter(|(index, volume_result)| volume_result.is_ok())
+            .filter(|(_, volume_result)| volume_result.is_ok())
             .map(|(index, volume_result)| (index, volume_result.unwrap()))
             .collect::<HashMap<u64, Volume>>();
 
-        Ok(Store {
-            volumes_dir: PathBuf::from(dir),
+        Ok(Storage {
+            directory: PathBuf::from(dir),
             volumes,
+            ip: ip.to_owned(),
+            port,
+            latest_volume,
             writable_volumes: HashSet::new(),
             readonly_volumes: HashSet::new(),
         })
