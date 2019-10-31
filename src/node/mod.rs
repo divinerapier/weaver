@@ -34,7 +34,7 @@ pub struct Router {
     pub volumes: HashMap<u64, Vec<u64>>,
 
     /// replica_replacement: [volume_id]
-    pub volume_replica_replacement: HashMap<crate::store::volume::ReplicaReplacement, Vec<u64>>,
+    pub volume_replica_replacement: HashMap<crate::storage::volume::ReplicaReplacement, Vec<u64>>,
 }
 
 impl Router {
@@ -56,7 +56,7 @@ impl Router {
     pub fn assign(
         &self,
         count: usize,
-        replica_replacement: crate::store::volume::ReplicaReplacement,
+        replica_replacement: crate::storage::volume::ReplicaReplacement,
     ) -> Result<Option<Vec<&Node>>> {
         let diff_cent = replica_replacement.diff_data_centers;
         let diff_rack = replica_replacement.diff_rack;

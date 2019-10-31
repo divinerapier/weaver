@@ -5,7 +5,7 @@ mod server;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     log::set_max_level(log::LevelFilter::max());
-    let svc = weaver_proto::storage::server::StorageServer::new(server::StoreService::new(
+    let svc = weaver_proto::storage::server::StorageServer::new(server::StorageService::new(
         "/data/weaver/",
     ));
     tonic::transport::Server::builder()

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::error::Result;
 use crate::needle::Needle;
-use crate::store::volume::Volume;
+use crate::storage::volume::Volume;
 
 #[allow(dead_code)]
 pub struct Directory {

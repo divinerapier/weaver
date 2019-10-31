@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crate::error::Result;
 use crate::needle::Needle;
-use crate::store::volume::Volume;
+use volume::Volume;
 
 pub mod volume;
 
