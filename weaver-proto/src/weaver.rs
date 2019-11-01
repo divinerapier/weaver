@@ -5,6 +5,54 @@ pub struct Status {
     #[prost(string, tag = "2")]
     pub message: std::string::String,
 }
+/// Needle is the unit of a volume. Align to 8 bytes.
+///    | 00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 |
+/// 00 |header_length|body_length| header                |
+/// 01 | header        | padding = 8 - header_length % 8 |
+/// 02 | body            | padding = 8 - body_length % 8 |
+///
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Needle {
+    /// should use binary encoder to encode length
+    #[prost(uint32, tag = "1")]
+    pub header_length: u32,
+    #[prost(uint32, tag = "2")]
+    pub body_length: u32,
+    /// let hl = headler_length;
+    /// let bl = body_length;
+    ///
+    /// fn pad(i: u32) -> u32 {
+    ///   match i & 7 {
+    ///     0 => i,
+    ///     d @ _ => i + 8 - d,
+    ///   }
+    /// }
+    ///
+    /// let header_padded = pad(header_length);
+    /// let body_padded = pad(body_length);
+    /// let data = read(reader, header_padded + body_padded);
+    /// let header = &data[0..header_length];
+    /// let body = &data[header_padded..header_padded+body_length];
+    #[prost(message, optional, tag = "3")]
+    pub header: ::std::option::Option<NeedleHeader>,
+    #[prost(bytes, tag = "4")]
+    pub body: std::vec::Vec<u8>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NeedleHeader {
+    #[prost(uint64, tag = "1")]
+    pub id: u64,
+    #[prost(uint64, tag = "2")]
+    pub cookie: u64,
+    #[prost(uint64, tag = "3")]
+    pub offset: u64,
+    #[prost(uint32, tag = "4")]
+    pub size: u32,
+    #[prost(uint64, tag = "5")]
+    pub total_size: u64,
+    #[prost(uint32, tag = "6")]
+    pub crc: u32,
+}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ReplicaReplacement {
     #[prost(uint32, tag = "1")]
@@ -15,15 +63,6 @@ pub struct ReplicaReplacement {
     /// in same rack
     #[prost(uint32, tag = "3")]
     pub node_count: u32,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ChunkId {
-    #[prost(uint32, tag = "1")]
-    pub volume_id: u32,
-    #[prost(uint64, tag = "2")]
-    pub file_key: u64,
-    #[prost(fixed32, tag = "3")]
-    pub cookie: u32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Attribute {
@@ -45,17 +84,24 @@ pub struct Attribute {
     #[prost(int32, tag = "9")]
     pub ttl_sec: i32,
 }
+/// Chunk refers to a needle.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Chunk {
-    #[prost(message, optional, tag = "1")]
-    pub id: ::std::option::Option<ChunkId>,
-    #[prost(int64, tag = "2")]
-    pub offset: i64,
+    #[prost(uint32, tag = "1")]
+    pub volume_id: u32,
+    #[prost(uint64, tag = "2")]
+    pub needle_id: u64,
     #[prost(uint64, tag = "3")]
+    pub cookie: u64,
+    #[prost(int64, tag = "4")]
+    pub offset: i64,
+    #[prost(uint64, tag = "5")]
     pub size: u64,
-    #[prost(string, tag = "5")]
+    #[prost(string, tag = "6")]
     pub etag: std::string::String,
 }
+/// Entry indicates an object info, includes name, chunks and attibute,
+/// used by directory.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Entry {
     #[prost(string, tag = "1")]
@@ -84,6 +130,7 @@ pub struct Location {
     #[prost(string, tag = "2")]
     pub presigned_url: std::string::String,
 }
+/// Node is a machine.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Node {
     #[prost(uint64, tag = "1")]
@@ -99,6 +146,7 @@ pub struct Node {
     #[prost(message, repeated, tag = "6")]
     pub volume_infos: ::std::vec::Vec<VolumeInformationMessage>,
 }
+/// Rack consists of many nodes.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Rack {
     #[prost(uint64, tag = "1")]
@@ -114,6 +162,7 @@ pub struct Rack {
     #[prost(message, repeated, tag = "6")]
     pub nodes: ::std::vec::Vec<Node>,
 }
+/// DataCenter consists of many racks.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DataCenter {
     #[prost(uint64, tag = "1")]

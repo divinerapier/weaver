@@ -19,18 +19,51 @@ message Status {
   string message = 2;
 }
 
+// Needle is the unit of a volume. Align to 8 bytes.
+//    | 00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 |
+// 00 |header_length|body_length| header                |
+// 01 | header        | padding = 8 - header_length % 8 |
+// 02 | body            | padding = 8 - body_length % 8 |
+//
+message Needle {
+  // should use binary encoder to encode length
+  uint32 header_length = 1;
+  uint32 body_length = 2;
+
+  // let hl = headler_length;
+  // let bl = body_length;
+  //
+  // fn pad(i: u32) -> u32 {
+  //   match i & 7 {
+  //     0 => i,
+  //     d @ _ => i + 8 - d,
+  //   }
+  // }
+  //
+  // let header_padded = pad(header_length);
+  // let body_padded = pad(body_length);
+  // let data = read(reader, header_padded + body_padded);
+  // let header = &data[0..header_length];
+  // let body = &data[header_padded..header_padded+body_length];
+  NeedleHeader header = 3;
+  bytes body = 4;
+}
+
+message NeedleHeader {
+  uint64 id = 1;
+  uint64 cookie = 2;
+  uint64 offset = 3;
+  uint32 size = 4;
+  uint64 total_size = 5;
+  uint32 crc = 6;
+}
+
 message ReplicaReplacement {
   uint32 data_center_count = 1;
   // in same data center
   uint32 rack_count = 2;
   // in same rack
   uint32 node_count = 3;
-}
-
-message ChunkID {
-  uint32 volume_id = 1;
-  uint64 file_key = 2;
-  fixed32 cookie = 3;
 }
 
 message Attribute {
@@ -44,13 +77,18 @@ message Attribute {
   int32 ttl_sec = 9;
 }
 
+// Chunk refers to a needle.
 message Chunk {
-  ChunkID id = 1;
-  int64 offset = 2;
-  uint64 size = 3;
-  string etag = 5;
+  uint32 volume_id = 1;
+  uint64 needle_id = 2;
+  uint64 cookie = 3;
+  int64 offset = 4;
+  uint64 size = 5;
+  string etag = 6;
 }
 
+// Entry indicates an object info, includes name, chunks and attibute,
+// used by directory.
 message Entry {
   string name = 1;
   repeated Chunk chunks = 3;
@@ -69,6 +107,7 @@ message Location {
   string presigned_url = 2;
 }
 
+// Node is a machine.
 message Node {
   uint64 id = 1;
   uint64 volume_count = 2;
@@ -78,6 +117,7 @@ message Node {
   repeated VolumeInformationMessage volume_infos = 6;
 }
 
+// Rack consists of many nodes.
 message Rack {
   uint64 id = 1;
   uint64 volume_count = 2;
@@ -87,6 +127,7 @@ message Rack {
   repeated Node nodes = 6;
 }
 
+// DataCenter consists of many racks.
 message DataCenter {
   uint64 id = 1;
   uint64 volume_count = 2;
