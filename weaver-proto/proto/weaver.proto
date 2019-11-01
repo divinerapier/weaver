@@ -26,10 +26,6 @@ message Status {
 // 02 | body            | padding = 8 - body_length % 8 |
 //
 message Needle {
-  // should use binary encoder to encode length
-  uint32 header_length = 1;
-  uint32 body_length = 2;
-
   // let hl = headler_length;
   // let bl = body_length;
   //

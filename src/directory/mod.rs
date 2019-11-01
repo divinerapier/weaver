@@ -54,14 +54,17 @@ impl Directory {
                     .ok_or(boxed_volume_not_found!(index));
 
                 let volume_ref = volume_ref?;
-                for (k, v) in &volume_ref.indexes {
+                let indexes = volume_ref.indexes.clone();
+                let indexes = indexes.read().unwrap();
+                let indexes: &HashMap<_, _> = &indexes;
+                for (k, v) in indexes {
                     result.needle_map.insert(*k, index);
                 }
                 Ok(())
             });
         }
         // should sort volumes by volume.id
-        result.volumes.sort_by_key(|e| e.id);
+        result.volumes.sort_by_key(|e| e.id());
         Ok(result)
     }
 
@@ -86,7 +89,7 @@ impl Directory {
             .get_mut(volume_id as usize)
             .ok_or(boxed_volume_not_found!(volume_id))?;
         volume.write_needle(needle_id, body)?;
-        self.needle_map.insert(needle_id, volume.id);
+        self.needle_map.insert(needle_id, volume.id() as u32);
         if !volume.writable() {
             self.writable_volumes.remove(&volume_id);
             self.readonly_volumes.insert(volume_id);
@@ -109,7 +112,7 @@ impl Directory {
                         self.volumes.len() as u32,
                         self.volume_size,
                     )?;
-                    let volume_id = volume.id;
+                    let volume_id = volume.id() as u32;
                     self.volumes.push(volume);
                     self.writable_volumes.insert(volume_id);
                     return Ok(volume_id);
@@ -125,7 +128,7 @@ impl Directory {
                 self.volumes.len() as u32,
                 self.volume_size,
             )?;
-            let volume_id = volume.id;
+            let volume_id = volume.id() as u32;
             self.volumes.push(volume);
             self.writable_volumes.insert(volume_id);
             Ok(volume_id)
@@ -134,16 +137,16 @@ impl Directory {
             .volumes
             .get_mut(volume_id as usize)
             .ok_or(boxed_volume_not_found!(volume_id))?;
-        if volume.max_length - volume.current_length < length as u64 {
+        if volume.max_length() - volume.current_length() < length as u64 {
             log::warn!(
                 "volume almost full. max: {}, current: {}, todo: {}",
-                volume.max_length,
-                volume.current_length,
+                volume.max_length(),
+                volume.current_length(),
                 length
             );
             return Err(boxed_no_writable_volumes!());
         }
-        Ok(volume.id)
+        Ok(volume.id() as u32)
     }
 
     // Notice: this is not randomly, different from golang

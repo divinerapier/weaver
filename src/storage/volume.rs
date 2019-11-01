@@ -3,6 +3,8 @@ use crate::index::{Index, RawIndex};
 use crate::needle::{Needle, NeedleBody, NeedleHeader};
 use crate::utils;
 
+use bytes::ByteOrder;
+
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::ffi::OsStr;
@@ -10,6 +12,10 @@ use std::fmt::Display;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, Mutex, RwLock,
+};
 
 use serde::Serialize;
 use serde_json::Deserializer;
@@ -41,33 +47,62 @@ impl From<&OsStr> for VolumeExtension {
     }
 }
 
-#[derive(Serialize, Debug)]
-pub struct Volume {
-    pub id: u32,
-    pub path: String,
-    #[serde(skip_serializing)]
-    pub writable_volume: File,
-    #[serde(skip_serializing)]
-    pub readonly_volume: File,
-    pub current_length: u64,
-    pub max_length: u64,
-    #[serde(skip_serializing)]
-    pub index_file: File,
-    pub indexes: HashMap<u64, RawIndex>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub struct ReplicaReplacement {
-    pub diff_data_centers: u8,
-    pub diff_rack: u8,
-    pub diff_node: u8,
+    pub data_center_count: u8,
+    pub rack_count: u8,
+    pub node_count: u8,
 }
 
 impl ReplicaReplacement {
-    pub fn count(&self) -> usize {
-        self.diff_data_centers as usize * self.diff_node as usize * self.diff_rack as usize
+    pub fn replica_count(&self) -> usize {
+        self.data_center_count as usize * self.rack_count as usize * self.node_count as usize
     }
 }
+
+impl Default for ReplicaReplacement {
+    fn default() -> Self {
+        ReplicaReplacement {
+            data_center_count: 1,
+            rack_count: 1,
+            node_count: 1,
+        }
+    }
+}
+
+pub struct Volume {
+    pub attibute: VolumeAttibute,
+    pub writable_volume: Arc<Mutex<File>>,
+    pub readonly_volume: Arc<File>,
+    pub current_length: AtomicU64,
+    pub index_file: Arc<Mutex<File>>,
+    pub indexes: Arc<RwLock<HashMap<u64, RawIndex>>>,
+}
+
+pub struct VolumeAttibute {
+    pub id: AtomicU64,
+    pub path: Arc<String>,
+    pub max_length: AtomicU64,
+    pub replica_replacement: Option<ReplicaReplacement>,
+}
+
+impl Volume {
+    pub fn id(&self) -> u64 {
+        self.attibute.id.load(Ordering::Relaxed)
+    }
+    pub fn path(&self) -> &str {
+        &self.attibute.path
+    }
+    pub fn max_length(&self) -> u64 {
+        self.attibute.max_length.load(Ordering::Relaxed)
+    }
+    pub fn current_length(&self) -> u64 {
+        self.current_length.load(Ordering::Relaxed)
+    }
+}
+
+unsafe impl Send for Volume {}
+unsafe impl Sync for Volume {}
 
 pub struct SuperBlock {
     pub replica_replacement: ReplicaReplacement,
@@ -103,17 +138,22 @@ impl Volume {
         let (readonly_file, writable_file) = Self::open_volumes(&volume_path, true)?;
         let current_length = writable_file.metadata()?.len();
         Ok(Volume {
-            id,
-            path: volume_path
-                .to_str()
-                .ok_or(naive!("{:?} to string", volume_path))?
-                .to_owned(),
-            writable_volume: writable_file,
-            readonly_volume: readonly_file,
-            current_length,
-            max_length: size,
-            index_file,
-            indexes: index_map,
+            attibute: VolumeAttibute {
+                id: AtomicU64::new(id as u64),
+                path: Arc::new(
+                    volume_path
+                        .to_str()
+                        .ok_or(naive!("{:?} to string", volume_path))?
+                        .to_owned(),
+                ),
+                max_length: AtomicU64::new(size),
+                replica_replacement: None,
+            },
+            writable_volume: Arc::new(Mutex::new(writable_file)),
+            readonly_volume: Arc::new(readonly_file),
+            current_length: AtomicU64::new(current_length),
+            index_file: Arc::new(Mutex::new(index_file)),
+            indexes: Arc::new(RwLock::new(index_map)),
         })
     }
 
@@ -161,20 +201,86 @@ impl Volume {
                 ),
             )));
         }
+
         Ok(Volume {
-            id,
-            path: volume_path
-                .to_str()
-                .ok_or(naive!("{:?} to string", volume_path))?
-                .to_owned(),
-            writable_volume: writable_file,
-            readonly_volume: readonly_file,
-            current_length,
-            max_length: size,
-            index_file,
-            indexes: index_map,
+            attibute: VolumeAttibute {
+                id: AtomicU64::new(id as u64),
+                path: Arc::new(
+                    volume_path
+                        .to_str()
+                        .ok_or(naive!("{:?} to string", volume_path))?
+                        .to_owned(),
+                ),
+                max_length: AtomicU64::new(size),
+                replica_replacement: None,
+            },
+            writable_volume: Arc::new(Mutex::new(writable_file)),
+            readonly_volume: Arc::new(readonly_file),
+            current_length: AtomicU64::new(current_length),
+            index_file: Arc::new(Mutex::new(index_file)),
+            indexes: Arc::new(RwLock::new(index_map)),
         })
     }
+
+    pub fn new2<P: AsRef<Path>>(
+        dir: P,
+        id: u32,
+        size: u64,
+        replica_replacement: ReplicaReplacement,
+    ) -> Result<Volume> {
+        fn path_exists(id: u32, path: &PathBuf) -> Result<()> {
+            if path.exists() {
+                log::error!("file exists. id: {}, path: {}", id, path.display());
+                return Err(boxed_volume_create!(id, "exists"));
+            } else {
+                Ok(())
+            }
+        }
+        fn _write_superblock(file: &mut File, super_block: &SuperBlock) -> Result<()> {
+            let mut buffer = vec![0u8; 4];
+            let value = (super_block.replica_replacement.data_center_count as u32) << 16
+                | (super_block.replica_replacement.rack_count as u32) << 8
+                | super_block.replica_replacement.node_count as u32;
+            bytes::BigEndian::write_u32(&mut buffer[0..4], value);
+            file.write_all(&buffer)?;
+            Ok(())
+        }
+
+        let volume_path: PathBuf = dir.as_ref().join(format!("{}.data", id));
+        let index_path: PathBuf = dir.as_ref().join(format!("{}.index", id));
+        path_exists(id, &volume_path)?;
+        path_exists(id, &index_path)?;
+        let (index_file, index_map, _) = Self::open_indexes(index_path, true)?;
+        let (readonly_file, mut writable_file) = Self::open_volumes(&volume_path, true)?;
+
+        _write_superblock(
+            &mut writable_file,
+            &SuperBlock {
+                replica_replacement,
+            },
+        )?;
+        let current_length = writable_file.metadata()?.len();
+        Ok(Volume {
+            attibute: VolumeAttibute {
+                id: AtomicU64::new(id as u64),
+                path: Arc::new(
+                    volume_path
+                        .to_str()
+                        .ok_or(naive!("{:?} to string", volume_path))?
+                        .to_owned(),
+                ),
+                max_length: AtomicU64::new(size),
+                replica_replacement: Some(replica_replacement),
+            },
+            writable_volume: Arc::new(Mutex::new(writable_file)),
+            readonly_volume: Arc::new(readonly_file),
+            current_length: AtomicU64::new(current_length),
+            index_file: Arc::new(Mutex::new(index_file)),
+            indexes: Arc::new(RwLock::new(index_map)),
+        })
+    }
+
+    pub fn open2() {}
 
     fn parse_volume_file_stem_name(volume_path: &Path) -> Result<u32> {
         let file_stem = volume_path
@@ -190,7 +296,9 @@ impl Volume {
     }
 
     pub fn writable(&self) -> bool {
-        self.current_length < self.max_length
+        let max_length = self.max_length();
+        let current_length = self.current_length.load(Ordering::SeqCst);
+        current_length < max_length
     }
 
     pub fn readonly(&self) -> bool {
@@ -198,19 +306,13 @@ impl Volume {
     }
 
     pub fn available_length(&self) -> u64 {
-        if self.max_length > self.current_length {
-            self.max_length - self.current_length
+        let max_length = self.max_length();
+        let current_length = self.current_length.load(Ordering::SeqCst);
+        if max_length > current_length {
+            max_length - current_length
         } else {
             0
         }
-    }
-
-    pub fn info(&self) -> String {
-        serde_json::to_string(self).unwrap()
-    }
-
-    pub fn pretty_info(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap()
     }
 
     fn open_volumes<P: AsRef<Path>>(volume_filepath: P, new: bool) -> Result<(File, File)> {
@@ -267,11 +369,6 @@ impl Volume {
 
     fn can_write(&self, _length: u64) -> bool {
         return self.writable();
-        // if self.readonly() {
-        //     return false;
-        // }
-        // let length_after_write = self.current_length + length;
-        // return length_after_write <= self.max_length;
     }
 
     pub fn write_needle(&mut self, needle_id: u64, needle: Needle) -> Result<()> {
@@ -280,37 +377,41 @@ impl Volume {
         if !self.can_write(total_length as u64) {
             log::error!(
                 "couldn't write to the volume. id: {}, path: {}, writable: {}, max_length: {}, current_length: {}, actual_data_length: {}, total_length: {}",
-                self.id,
-                self.path,
+                self.id(),
+                self.path(),
                 self.writable(),
-                self.max_length,
-                self.current_length,
+                self.max_length(),
+                self.current_length(),
                actual_data_length,
                total_length
             );
             return Err(Error::volume(error::VolumeError::overflow(
-                self.id,
-                self.max_length,
-                self.current_length,
+                self.id() as u32,
+                self.max_length(),
+                self.current_length(),
                 total_length as u64,
             )));
         }
         let mut received_length = 0usize;
-        let mut writable_volume = self.writable_volume.try_clone()?;
-        writable_volume.seek(SeekFrom::Start(self.current_length))?;
 
-        let mut writer = BufWriter::new(writable_volume);
+        {
+            let writable_volume = self.writable_volume.clone();
+            let mut writable_volume = writable_volume.lock().unwrap();
+            writable_volume.seek(SeekFrom::Start(self.current_length()))?;
 
-        let needle_iter = needle.into_iter();
-        for data in needle_iter {
-            let data = data?;
-            log::debug!("data: {:?}", data);
-            received_length += data.len();
-            writer.write_all(data.as_ref())?;
+            let writable_volume: &mut File = &mut writable_volume;
+            let mut writer = BufWriter::new(writable_volume);
+
+            let needle_iter = needle.into_iter();
+            for data in needle_iter {
+                let data = data?;
+                log::debug!("data: {:?}", data);
+                received_length += data.len();
+                writer.write_all(data.as_ref())?;
+            }
+
+            writer.flush()?;
         }
-
-        writer.flush()?;
-
         if received_length != actual_data_length {
             log::error!(
                 "mismatched needle length. received: {}, actual: {}, total: {}",
@@ -319,36 +420,96 @@ impl Volume {
                 total_length,
             );
             return Err(Error::volume(error::VolumeError::write_length_mismatch(
-                self.id,
+                self.id() as u32,
                 needle_id.to_string(),
                 actual_data_length,
                 received_length,
             )));
         }
 
-        // write index
-        // TODO: supports write-ahead log
-
         let index = Index::new(
             needle_id,
-            self.id,
-            self.current_length as usize,
+            self.id() as u32,
+            self.current_length() as usize,
             total_length,
         );
-        self.index_file
-            .write_all(serde_json::to_string(&index)?.as_bytes())?;
-        self.current_length += total_length as u64;
-        self.writable_volume.set_len(self.current_length)?;
-        self.indexes.insert(
+
+        {
+            let mut index_file = self.index_file.lock().unwrap();
+            index_file.write_all(serde_json::to_string(&index)?.as_bytes())?;
+            self.current_length
+                .fetch_add(total_length as u64, Ordering::SeqCst);
+        }
+        let mut indexes = self.indexes.write().unwrap();
+        indexes.insert(
             needle_id,
             RawIndex::new(index.volume_id, index.offset, index.length),
         );
         Ok(())
     }
 
+    pub async fn write_needle2(&mut self, needle: weaver_proto::weaver::Needle) -> Result<()> {
+        if needle.header.is_none() {
+            return Err(boxed_naive!("failed to write empty needle"));
+        }
+        self._write_needle(&needle).await?;
+        self._write_index(&needle).await?;
+        Ok(())
+    }
+
+    async fn _write_needle(&mut self, needle: &weaver_proto::weaver::Needle) -> Result<()> {
+        let header = needle.header.as_ref().unwrap();
+        let body: &[u8] = &needle.body;
+
+        assert_eq!(header.size as usize, body.len());
+
+        let mut buffer = vec![0u8; 40];
+        bytes::BigEndian::write_u64(&mut buffer[0..8], header.id);
+        bytes::BigEndian::write_u64(&mut buffer[8..16], header.cookie);
+        bytes::BigEndian::write_u64(&mut buffer[16..24], header.offset);
+        bytes::BigEndian::write_u32(&mut buffer[24..28], header.size);
+        bytes::BigEndian::write_u64(&mut buffer[28..36], header.total_size);
+        bytes::BigEndian::write_u32(&mut buffer[36..40], header.crc);
+
+        {
+            let writable_volume = self.writable_volume.clone();
+            let writable_volume = writable_volume.lock().unwrap();
+            let writer: &File = &writable_volume;
+            let mut writer = BufWriter::new(writer);
+            writer.write_all(&buffer)?;
+            writer.write_all(body)?;
+            Ok(writer.flush()?)
+        }
+    }
+
+    async fn _write_index(&mut self, needle: &weaver_proto::weaver::Needle) -> Result<()> {
+        let needle = needle.header.as_ref().unwrap();
+        let index = Index::new(
+            needle.id,
+            self.id() as u32,
+            self.current_length() as usize,
+            needle.total_size as usize,
+        );
+
+        {
+            let mut index_file = self.index_file.lock().unwrap();
+            index_file.write_all(serde_json::to_string(&index)?.as_bytes())?;
+        }
+        self.current_length
+            .fetch_add(needle.total_size, Ordering::SeqCst);
+        {
+            let mut indexes = self.indexes.write().unwrap();
+            indexes.insert(
+                needle.id,
+                RawIndex::new(index.volume_id, index.offset, index.length),
+            );
+        }
+        Ok(())
+    }
+
     pub fn get(&self, needle_id: u64) -> Result<Needle> {
-        let index: RawIndex = self
-            .indexes
+        let indexes = self.indexes.read().unwrap();
+        let index: RawIndex = indexes
             .get(&needle_id)
             .ok_or(Error::not_found(format!(
                 "needle not in indexes: {}, indexes: {:?}",
@@ -356,11 +517,11 @@ impl Volume {
             )))?
             .clone();
         log::debug!("index: {:?}", index);
-        if ((index.offset + index.length) as u64) > self.current_length {
+        if ((index.offset + index.length) as u64) > self.current_length() {
             log::error!(
                 "volume data corruption. needle: {}, volume_length: {}, index.offset: {}, index.length: {}",
                 needle_id,
-                self.current_length,
+                self.current_length(),
                 index.offset,
                 index.length
             );
@@ -384,7 +545,8 @@ impl Volume {
     pub fn read_needle_body() {}
 
     pub fn read_needle(&self, index: &RawIndex) -> Result<Needle> {
-        let mut readonly_volume = self.readonly_volume.try_clone()?;
+        let readonly_volume = self.readonly_volume.clone();
+        let mut readonly_volume = readonly_volume.try_clone()?;
         let needle_header = Self::read_needle_header(&mut readonly_volume, index.offset)?;
         log::debug!("header: {:?}", needle_header);
         let body_size = needle_header.body_length();
@@ -398,7 +560,6 @@ impl Volume {
         ))?;
         let mut buffer = Vec::with_capacity(batch_size);
         buffer.resize(batch_size, 0 as u8);
-        let mut readonly_volume = self.readonly_volume.try_clone()?;
         if index.length <= 8 {
             readonly_volume.read_exact(&mut buffer)?;
             return Ok(Needle::new(

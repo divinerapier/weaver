@@ -58,9 +58,9 @@ impl Router {
         count: usize,
         replica_replacement: crate::storage::volume::ReplicaReplacement,
     ) -> Result<Option<Vec<&Node>>> {
-        let diff_cent = replica_replacement.diff_data_centers;
-        let diff_rack = replica_replacement.diff_rack;
-        let diff_node = replica_replacement.diff_node;
+        let diff_cent = replica_replacement.data_center_count;
+        let diff_rack = replica_replacement.rack_count;
+        let diff_node = replica_replacement.node_count;
 
         if diff_node == 0 || diff_rack == 0 || diff_cent == 0 {
             return Err(boxed_naive!(
@@ -75,7 +75,7 @@ impl Router {
         }
         let volumes_ids = volumes_ids.unwrap();
 
-        let mut result = Vec::with_capacity(replica_replacement.count());
+        let mut result = Vec::with_capacity(replica_replacement.replica_count());
 
         for volume_id in volumes_ids {
             let nodes_ids = self.volumes.get(volume_id);

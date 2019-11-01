@@ -10,9 +10,11 @@ release:
 	cargo build --release --package weaver-directory
 	cargo build --release --package weaver-storage
 
-test:
+test: cargo-fmt generate-proto
 	RUST_BACKTRACE=full cargo test -- --nocapture
 	
-generate-proto:
+generate-proto: cargo-fmt
 	cargo build --package weaver-proto
 
+cargo-fmt:
+	cargo fmt

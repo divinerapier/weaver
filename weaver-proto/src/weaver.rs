@@ -13,11 +13,6 @@ pub struct Status {
 ///
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Needle {
-    /// should use binary encoder to encode length
-    #[prost(uint32, tag = "1")]
-    pub header_length: u32,
-    #[prost(uint32, tag = "2")]
-    pub body_length: u32,
     /// let hl = headler_length;
     /// let bl = body_length;
     ///
