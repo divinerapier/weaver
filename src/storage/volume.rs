@@ -71,6 +71,7 @@ impl Default for ReplicaReplacement {
 }
 
 pub struct Volume {
+    pub super_block: Arc<RwLock<SuperBlock>>,
     pub attibute: VolumeAttibute,
     pub writable_volume: Arc<Mutex<File>>,
     pub readonly_volume: Arc<File>,
@@ -79,11 +80,13 @@ pub struct Volume {
     pub indexes: Arc<RwLock<HashMap<u64, RawIndex>>>,
 }
 
+unsafe impl Send for Volume {}
+unsafe impl Sync for Volume {}
+
 pub struct VolumeAttibute {
     pub id: AtomicU64,
     pub path: Arc<String>,
     pub max_length: AtomicU64,
-    pub replica_replacement: Option<ReplicaReplacement>,
 }
 
 impl Volume {
@@ -101,11 +104,82 @@ impl Volume {
     }
 }
 
-unsafe impl Send for Volume {}
-unsafe impl Sync for Volume {}
-
+#[derive(Copy, Clone)]
 pub struct SuperBlock {
     pub replica_replacement: ReplicaReplacement,
+    pub max_volume_size: u32,
+    pub max_needle_count: u32,
+}
+
+impl Default for SuperBlock {
+    fn default() -> Self {
+        SuperBlock {
+            replica_replacement: ReplicaReplacement::default(),
+            max_volume_size: 0,
+            max_needle_count: 0,
+        }
+    }
+}
+
+impl SuperBlock {
+    pub fn new(
+        replica_replacement: Option<ReplicaReplacement>,
+        max_volume_size: u32,
+        max_needle_count: u32,
+    ) -> SuperBlock {
+        SuperBlock {
+            replica_replacement: replica_replacement.unwrap_or_default(),
+            max_volume_size,
+            max_needle_count,
+        }
+    }
+
+    pub fn as_bytes(&self) -> Vec<u8> {
+        let buffer_length = 4 /*replica replacement*/ + 4 /*max_volume_size*/ + 4 /*max_needle_count*/;
+        let mut buffer = vec![0u8; buffer_length];
+        let value = (self.replica_replacement.data_center_count as u32) << 16
+            | (self.replica_replacement.rack_count as u32) << 8
+            | self.replica_replacement.node_count as u32;
+        bytes::BigEndian::write_u32(&mut buffer[0..4], value);
+        bytes::BigEndian::write_u32(&mut buffer[4..8], self.max_volume_size);
+        bytes::BigEndian::write_u32(&mut buffer[8..], self.max_needle_count);
+        buffer
+    }
+
+    pub fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<()> {
+        writer.write_all(&self.as_bytes())?;
+        Ok(writer.flush()?)
+    }
+
+    pub fn read_from<R: std::io::Read>(reader: &mut R) -> Result<SuperBlock> {
+        let buffer_length = 4 /*replica replacement*/ + 4 /*max_volume_size*/ + 4 /*max_needle_count*/;
+        let mut buffer = vec![0u8; buffer_length];
+        reader.read_exact(&mut buffer)?;
+        let buffer : &[u8] = &buffer;
+        let super_block : SuperBlock= SuperBlock::from(buffer);
+        Ok(super_block)
+    }
+}
+
+impl From<&[u8]> for SuperBlock {
+    fn from(data: &[u8]) -> Self {
+        assert!(data.len() >= 12);
+        let value = bytes::BigEndian::read_u32(&data[0..4]);
+        let max_volume_size = bytes::BigEndian::read_u32(&data[4..8]);
+        let max_needle_count = bytes::BigEndian::read_u32(&data[8..12]);
+        let data_center_count = ((value & 0x0f00) >> 16) as u8;
+        let rack_count = ((value & 0x00f0) >> 8) as u8;
+        let node_count = (value & 0x000f) as u8;
+        SuperBlock {
+            replica_replacement: ReplicaReplacement {
+                data_center_count,
+                rack_count,
+                node_count,
+            },
+            max_volume_size,
+            max_needle_count,
+        }
+    }
 }
 
 impl Display for Volume {
@@ -138,6 +212,7 @@ impl Volume {
         let (readonly_file, writable_file) = Self::open_volumes(&volume_path, true)?;
         let current_length = writable_file.metadata()?.len();
         Ok(Volume {
+            super_block: Arc::new(RwLock::new(SuperBlock::default())),
             attibute: VolumeAttibute {
                 id: AtomicU64::new(id as u64),
                 path: Arc::new(
@@ -147,7 +222,6 @@ impl Volume {
                         .to_owned(),
                 ),
                 max_length: AtomicU64::new(size),
-                replica_replacement: None,
             },
             writable_volume: Arc::new(Mutex::new(writable_file)),
             readonly_volume: Arc::new(readonly_file),
@@ -203,6 +277,7 @@ impl Volume {
         }
 
         Ok(Volume {
+            super_block: Arc::new(RwLock::new(SuperBlock::default())),
             attibute: VolumeAttibute {
                 id: AtomicU64::new(id as u64),
                 path: Arc::new(
@@ -212,7 +287,6 @@ impl Volume {
                         .to_owned(),
                 ),
                 max_length: AtomicU64::new(size),
-                replica_replacement: None,
             },
             writable_volume: Arc::new(Mutex::new(writable_file)),
             readonly_volume: Arc::new(readonly_file),
@@ -231,21 +305,13 @@ impl Volume {
         }
     }
 
-    fn _write_superblock(file: &mut File, super_block: &SuperBlock) -> Result<()> {
-        let mut buffer = vec![0u8; 4];
-        let value = (super_block.replica_replacement.data_center_count as u32) << 16
-            | (super_block.replica_replacement.rack_count as u32) << 8
-            | super_block.replica_replacement.node_count as u32;
-        bytes::BigEndian::write_u32(&mut buffer[0..4], value);
-        file.write_all(&buffer)?;
-        Ok(())
-    }
-
+    // Create a new volume on the specified directory with the id as its name.
+    // And set the size and replica replacement of the volume.
     pub fn new2<P: AsRef<Path>>(
         dir: P,
         id: u32,
         size: u64,
-        replica_replacement: ReplicaReplacement,
+        super_block: &SuperBlock,
     ) -> Result<Volume> {
         let volume_path: PathBuf = dir.as_ref().join(format!("{}.data", id));
         let index_path: PathBuf = dir.as_ref().join(format!("{}.index", id));
@@ -254,14 +320,11 @@ impl Volume {
         let (index_file, index_map, _) = Self::open_indexes(index_path, true)?;
         let (readonly_file, mut writable_file) = Self::open_volumes(&volume_path, true)?;
 
-        Self::_write_superblock(
-            &mut writable_file,
-            &SuperBlock {
-                replica_replacement,
-            },
-        )?;
+        super_block.write_to(&mut writable_file)?;
+
         let current_length = writable_file.metadata()?.len();
         Ok(Volume {
+            super_block: Arc::new(RwLock::new(super_block.clone())),
             attibute: VolumeAttibute {
                 id: AtomicU64::new(id as u64),
                 path: Arc::new(
@@ -271,7 +334,6 @@ impl Volume {
                         .to_owned(),
                 ),
                 max_length: AtomicU64::new(size),
-                replica_replacement: Some(replica_replacement),
             },
             writable_volume: Arc::new(Mutex::new(writable_file)),
             readonly_volume: Arc::new(readonly_file),
@@ -281,21 +343,22 @@ impl Volume {
         })
     }
 
+    // Open the exist file.
     pub fn open2(dir: &str, id: u64, size: u64) -> Result<Volume> {
         // filename should be a usize number
         let data_file_path = format!("{}/{}.data", dir, id);
         let index_file_path = format!("{}/{}.index", dir, id);
 
         let (index_file, index_map, last_index) = Self::open_indexes(index_file_path, false)?;
-        let (readonly_file, writable_file) = Self::open_volumes(&data_file_path, false)?;
+        let (readonly_file, mut writable_file) = Self::open_volumes(&data_file_path, false)?;
         let current_length = writable_file.metadata()?.len();
         if current_length != (last_index.offset + last_index.length) as u64 {
             log::error!(
-                "volume data corruption. dir: {}, id: {}, path: {}, current_length: {}, last_index.offset: {}, last_index.length: {}",
+                "volume data corruption. {}:{}, {}, current_length: {}, last_index.offset: {}, last_index.length: {}",
                 dir,
-                 id,
-data_file_path, 
-               current_length,
+                id,
+                data_file_path,
+                current_length,
                 last_index.offset,
                 last_index.length
             );
@@ -308,12 +371,15 @@ data_file_path,
             )));
         }
 
+        let super_block = SuperBlock::read_from(&mut writable_file)?;
+
         Ok(Volume {
+            // FIXME: read super block from volume file
+            super_block: Arc::new(RwLock::new(super_block)),
             attibute: VolumeAttibute {
                 id: AtomicU64::new(id as u64),
                 path: Arc::new(dir.to_owned()),
                 max_length: AtomicU64::new(size),
-                replica_replacement: None,
             },
             writable_volume: Arc::new(Mutex::new(writable_file)),
             readonly_volume: Arc::new(readonly_file),

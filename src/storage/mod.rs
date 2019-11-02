@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::fs::Metadata;
 use std::path::{Path, PathBuf};
 
 use crate::error::Result;
@@ -21,7 +20,7 @@ pub struct Storage {
     pub port: u16,
 
     /// the max volume id of storage
-    pub latest_volume: u64,
+    pub latest_volume_id: u64,
 
     pub writable_volumes: HashSet<u64>,
     pub readonly_volumes: HashSet<u64>,
@@ -30,7 +29,7 @@ pub struct Storage {
 impl Storage {
     pub fn new(dir: &str, ip: &str, port: u16) -> Result<Storage> {
         let dir_result = std::fs::read_dir(dir)?;
-        let mut latest_volume = 0;
+        let mut latest_volume_id = 0;
 
         let index_files = dir_result
             .filter_map(|entry| {
@@ -77,8 +76,8 @@ impl Storage {
             })
             .map(|(index, index_file_name)| {
                 let volume_result = Volume::open(&Path::new(dir).join(index_file_name), 128);
-                if index > latest_volume {
-                    latest_volume = index;
+                if index > latest_volume_id {
+                    latest_volume_id = index;
                 }
                 (index, volume_result)
             })
@@ -91,15 +90,17 @@ impl Storage {
             volumes,
             ip: ip.to_owned(),
             port,
-            latest_volume,
+            latest_volume_id,
             writable_volumes: HashSet::new(),
             readonly_volumes: HashSet::new(),
         })
     }
 
+    // Create a storage instance on the specified directory and network address.
+    // Check and open volumes if there are data.
     pub fn new2(dir: &str, ip: &str, port: u16) -> Result<Storage> {
         let dir_result = std::fs::read_dir(dir)?;
-        let mut latest_volume = 0;
+        let mut latest_volume_id = 0;
 
         let index_files = dir_result
             .filter_map(|entry| {
@@ -144,10 +145,10 @@ impl Storage {
                 let index = index.ok()?;
                 Some((index as u64, index_file_name))
             })
-            .map(|(index, index_file_name)| {
+            .map(|(index, _index_file_name)| {
                 let volume_result = Volume::open2(dir, index, 128);
-                if index > latest_volume {
-                    latest_volume = index;
+                if index > latest_volume_id {
+                    latest_volume_id = index;
                 }
                 (index, volume_result)
             })
@@ -160,7 +161,7 @@ impl Storage {
             volumes,
             ip: ip.to_owned(),
             port,
-            latest_volume,
+            latest_volume_id,
             writable_volumes: HashSet::new(),
             readonly_volumes: HashSet::new(),
         })
