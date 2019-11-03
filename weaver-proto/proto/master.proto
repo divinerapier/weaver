@@ -5,7 +5,7 @@ package weaver.master;
 import "weaver.proto";
 
 service Master {
-  rpc SendHeartbeat(stream Heartbeat) returns (stream HeartbeatResponse) {}
+  rpc Heartbeat(stream HeartbeatRequest) returns (stream HeartbeatResponse) {}
   rpc KeepConnected(stream KeepConnectedRequest)
       returns (stream VolumeLocation) {}
   rpc LookupVolume(LookupVolumeRequest) returns (LookupVolumeResponse) {}
@@ -19,7 +19,7 @@ service Master {
       returns (GetMasterConfigurationResponse) {}
 }
 
-message Heartbeat {
+message HeartbeatRequest {
   string ip = 1;
   uint32 port = 2;
   string presigned_url = 3;

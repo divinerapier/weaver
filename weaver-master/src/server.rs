@@ -25,9 +25,9 @@ impl MasterService {
 #[tonic::async_trait]
 impl weaver_proto::master::server::Master for MasterService {
     #[doc = "Server streaming response type for the SendHeartbeat method."]
-    type SendHeartbeatStream =
+    type HeartbeatStream =
         tokio::sync::mpsc::Receiver<Result<weaver_proto::master::HeartbeatResponse, Status>>;
-    // type SendHeartbeatStream = std::pin::Pin<
+    // type HeartbeatStream = std::pin::Pin<
     //     Box<
     //         dyn Stream<Item = Result<weaver_proto::master::HeartbeatResponse, Status>>
     //             + Send
@@ -40,47 +40,10 @@ impl weaver_proto::master::server::Master for MasterService {
     type KeepConnectedStream =
         tokio::sync::mpsc::Receiver<Result<weaver_proto::master::VolumeLocation, Status>>;
 
-    async fn send_heartbeat(
+    async fn heartbeat(
         &self,
-        request: tonic::Request<tonic::Streaming<weaver_proto::master::Heartbeat>>,
-    ) -> Result<tonic::Response<Self::SendHeartbeatStream>, tonic::Status> {
-        // {
-        //     let stream = request.into_inner();
-        //     // let mut stream = stream;
-        //     let output = async_stream::try_stream! {
-        //             while let Some(heartbeat) = stream.next().await {
-        //             futures::pin_mut!(stream);
-        //             let heartbeat: weaver_proto::master::Heartbeat = heartbeat?;
-        //             for volume in heartbeat.volumes {
-        //                 // update exists volumes
-        //             }
-        //             for new_volume in heartbeat.new_volumes {
-        //                 // add new volumes
-        //             }
-        //             for deleted_volume in heartbeat.deleted_volumes {
-        //                 // delete exists volume
-        //             }
-        //             yield weaver_proto::master::HeartbeatResponse {
-        //                 volume_size_limit: 0,
-        //                 leader: "127.0.0.1:12345".to_owned(),
-        //                 metrics_address: "127.0.0.1:23456".to_owned(),
-        //                 metrics_interval_seconds: 1,
-        //             };
-        //         }
-        //     };
-
-        //     Ok(tonic::Response::new(Box::new(output)
-        //         as std::pin::Pin<
-        //             Box<
-        //                 dyn Stream<Item = Result<weaver_proto::master::HeartbeatResponse, Status>>
-        //                     + Send
-        //                     + Sync
-        //                     + 'static,
-        //             >,
-        //         >))
-        // }
-        // Err(tonic::Status::unimplemented("Not yet implemented"))
-
+        request: tonic::Request<tonic::Streaming<weaver_proto::master::HeartbeatRequest>>,
+    ) -> Result<tonic::Response<Self::HeartbeatStream>, tonic::Status> {
         let stream = request.into_inner();
 
         let (mut tx, rx) = tokio::sync::mpsc::channel(1);

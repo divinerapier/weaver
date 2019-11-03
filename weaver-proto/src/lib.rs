@@ -1,11 +1,20 @@
-// extern crate bytes;
-
-pub mod directory;
-pub mod master;
-pub mod storage;
-pub mod weaver;
-
 use weaver::*;
+
+pub mod weaver {
+    tonic::include_proto!("weaver");
+}
+
+pub mod directory {
+    tonic::include_proto!("weaver.directory");
+}
+
+pub mod storage {
+    tonic::include_proto!("weaver.storage");
+}
+
+pub mod master {
+    tonic::include_proto!("weaver.master");
+}
 
 impl weaver::ReplicaReplacement {
     pub fn replica_count(&self) -> usize {
