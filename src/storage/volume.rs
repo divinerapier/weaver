@@ -155,8 +155,8 @@ impl SuperBlock {
         let buffer_length = 4 /*replica replacement*/ + 4 /*max_volume_size*/ + 4 /*max_needle_count*/;
         let mut buffer = vec![0u8; buffer_length];
         reader.read_exact(&mut buffer)?;
-        let buffer : &[u8] = &buffer;
-        let super_block : SuperBlock= SuperBlock::from(buffer);
+        let buffer: &[u8] = &buffer;
+        let super_block: SuperBlock = SuperBlock::from(buffer);
         Ok(super_block)
     }
 }
