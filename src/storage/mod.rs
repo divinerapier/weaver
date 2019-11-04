@@ -192,10 +192,7 @@ impl Storage {
         max_needle_count: u32,
     ) -> Result<()> {
         if self.volumes.contains_key(&volume_id) {
-            return Err(boxed_naive!(
-                "failed to create an exists volume {}",
-                volume_id
-            ));
+            return Err(error!("failed to create an exists volume {}", volume_id));
         }
         let super_block =
             volume::SuperBlock::new(replica_replacement, max_volume_size, max_needle_count);
@@ -214,7 +211,7 @@ impl Storage {
     pub fn read_needle(&self, volume_id: u32, needle_id: u64) -> Result<Needle> {
         if volume_id as usize >= self.volumes.len() {
             // FIXME: index out of range
-            return Err(boxed_naive!("volume not found"));
+            return Err(error!("volume not found"));
         }
         let volume: &Volume = &self.volumes[&(volume_id as u64)];
         volume.get(needle_id)

@@ -121,7 +121,7 @@ impl DirectoryStorage for MemoryDirectoryStorage {
                 *ent = entry;
                 Ok(())
             }
-            None => Err(boxed_naive!("entry is not found. {}", entry.fullpath)),
+            None => Err(directory_error!("entry is not found. {}", entry.fullpath)),
         }
     }
 
@@ -129,7 +129,7 @@ impl DirectoryStorage for MemoryDirectoryStorage {
         let entries = self.entries.read().unwrap();
         match entries.get(&path) {
             Some((entry, _)) => Ok(entry.clone()),
-            None => Err(boxed_naive!("entry is not found. {}", path)),
+            None => Err(directory_error!("entry is not found. {}", path)),
         }
     }
 
@@ -149,7 +149,10 @@ impl DirectoryStorage for MemoryDirectoryStorage {
                 let p: &String = &path;
                 match entries.get(p) {
                     Some((_, None)) => {
-                        tx.send(Err(boxed_naive!("entry is not a directory. {:?}", path)));
+                        tx.send(Err(directory_error!(
+                            "entry is not a directory. {:?}",
+                            path
+                        )));
                         return;
                     }
                     Some((_, Some(children))) => {
@@ -160,7 +163,7 @@ impl DirectoryStorage for MemoryDirectoryStorage {
                         })
                     }
                     None => {
-                        tx.send(Err(boxed_naive!("entry is not found. {:?}", p)));
+                        tx.send(Err(directory_error!("entry is not found. {:?}", p)));
                         return;
                     }
                 }

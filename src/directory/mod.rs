@@ -48,12 +48,11 @@ impl Directory {
                     result.readonly_volumes.insert(index);
                 }
                 // TODO: optimize copying index
-                let volume_ref: Result<&Volume> = result
+                let volume_ref: &Volume = result
                     .volumes
                     .get(index as usize)
-                    .ok_or(boxed_volume_not_found!(index));
+                    .ok_or(storage_error!("volume not found: {}", index))?;
 
-                let volume_ref = volume_ref?;
                 let indexes = volume_ref.indexes.clone();
                 let indexes = indexes.read().unwrap();
                 let indexes: &HashMap<_, _> = &indexes;
@@ -72,7 +71,7 @@ impl Directory {
         let volume: &Volume = self
             .volumes
             .get(volume_id as usize)
-            .ok_or(boxed_volume_not_found!(volume_id))?;
+            .ok_or(storage_error!("volume not found: {}", volume_id))?;
         Ok(volume.get(needle_id)?)
     }
 
@@ -87,7 +86,7 @@ impl Directory {
         let volume: &mut Volume = self
             .volumes
             .get_mut(volume_id as usize)
-            .ok_or(boxed_volume_not_found!(volume_id))?;
+            .ok_or(storage_error!("volume not found: {}", volume_id))?;
         volume.write_needle(needle_id, body)?;
         self.needle_map.insert(needle_id, volume.id() as u32);
         if !volume.writable() {
@@ -136,7 +135,7 @@ impl Directory {
         let volume: &mut Volume = self
             .volumes
             .get_mut(volume_id as usize)
-            .ok_or(boxed_volume_not_found!(volume_id))?;
+            .ok_or(storage_error!("volume not found: {}", volume_id))?;
         if volume.max_length() - volume.current_length() < length as u64 {
             log::warn!(
                 "volume almost full. max: {}, current: {}, todo: {}",
@@ -144,7 +143,7 @@ impl Directory {
                 volume.current_length(),
                 length
             );
-            return Err(boxed_no_writable_volumes!());
+            return Err(storage_error!("volume is almost full. {}", volume_id));
         }
         Ok(volume.id() as u32)
     }
@@ -154,14 +153,14 @@ impl Directory {
     fn random_writable_volume(&self) -> Result<u32> {
         let length = self.writable_volumes.len();
         if length == 0 {
-            return Err(boxed_no_writable_volumes!());
+            return Err(storage_error!("no more writable volume"));
         }
         let index = srand::ThreadLocal::uint64() as usize;
         let index = index % self.writable_volumes.len();
         assert_eq!(length, self.writable_volumes.len());
         match self.writable_volumes.iter().skip(index).next() {
             Some(&volume_id) => Ok(volume_id),
-            None => Err(boxed_no_writable_volumes!()),
+            None => Err(storage_error!("unexpected error")),
         }
     }
 }

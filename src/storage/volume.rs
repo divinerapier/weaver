@@ -208,7 +208,7 @@ impl Volume {
                 id,
                 volume_path.display()
             );
-            return Err(boxed_volume_create!(id, "exists"));
+            return Err(storage_error!("exists volume data: {}", id));
         }
         if index_path.exists() {
             log::error!(
@@ -216,7 +216,7 @@ impl Volume {
                 id,
                 index_path.display()
             );
-            return Err(boxed_index_create!(id, "exists"));
+            return Err(storage_error!("exists volume index: {}", id));
         }
         let (index_file, index_map, _) = Self::open_indexes(index_path, true)?;
         let (readonly_file, writable_file) = Self::open_volumes(&volume_path, true)?;
@@ -228,7 +228,7 @@ impl Volume {
                 path: Arc::new(
                     volume_path
                         .to_str()
-                        .ok_or(naive!("{:?} to string", volume_path))?
+                        .ok_or(storage_error!("parse volume path: {:?}", volume_path))?
                         .to_owned(),
                 ),
                 max_length: AtomicU64::new(size),
@@ -244,24 +244,20 @@ impl Volume {
     /// open a physical volume file from disk
     /// volume_path is the
     pub fn open(volume_path: &Path, size: u64) -> Result<Volume> {
-        let extension = volume_path.extension().ok_or(Error::path(
-            format! {"get file_stem from {:?}", volume_path},
-        ))?;
+        let extension = volume_path
+            .extension()
+            .ok_or(storage_error!("get file_stem from {:?}", volume_path))?;
         if extension != "index" {
-            return Err(Box::new(Error::OpenVolume));
+            return Err(storage_error!("open path: {:?}", volume_path));
         }
         // filename should be a usize number
-        let volume_path_str = volume_path.to_str().ok_or(Error::parse(
-            "std::path::Path",
-            "&str",
-            format!("{:?}", volume_path),
-        ))?;
+        let volume_path_str = volume_path
+            .to_str()
+            .ok_or(storage_error!("std::path::Path -> &str. {:?}", volume_path))?;
         let id = Self::parse_volume_file_stem_name(volume_path)?;
-        let extension_str = extension.to_str().ok_or(Error::parse(
-            "std::path::Path",
-            "&str",
-            format!("{:?}", extension),
-        ))?;
+        let extension_str = extension
+            .to_str()
+            .ok_or(storage_error!("std::path::Path -> &str. {:?}", extension))?;
         let naive_volume_path_str = utils::strings::trim_suffix(volume_path_str, extension_str)?;
         let index_file_str = naive_volume_path_str.to_owned() + "index";
         let volume_file_str = naive_volume_path_str.to_owned() + "data";
@@ -277,13 +273,13 @@ impl Volume {
                 last_index.offset,
                 last_index.length
             );
-            return Err(Error::volume(error::VolumeError::data_corruption(
+            return Err(storage_error!(
+                "volume: {}, current length: {}, last_index.offset: {}, last_index.length: {}",
                 id,
-                format!(
-                    "volume current length: {}, last_index.offset: {}, last_index.length: {}",
-                    current_length, last_index.offset, last_index.length
-                ),
-            )));
+                current_length,
+                last_index.offset,
+                last_index.length
+            ));
         }
 
         Ok(Volume {
@@ -293,7 +289,7 @@ impl Volume {
                 path: Arc::new(
                     volume_path
                         .to_str()
-                        .ok_or(naive!("{:?} to string", volume_path))?
+                        .ok_or(storage_error!("parse volume path: {:?}", volume_path))?
                         .to_owned(),
                 ),
                 max_length: AtomicU64::new(size),
@@ -309,7 +305,11 @@ impl Volume {
     fn path_exists(id: u32, path: &PathBuf) -> Result<()> {
         if path.exists() {
             log::error!("file exists. id: {}, path: {}", id, path.display());
-            return Err(boxed_volume_create!(id, "exists"));
+            return Err(storage_error!(
+                "exists volume file. id: {}, path: {:?}",
+                id,
+                path
+            ));
         } else {
             Ok(())
         }
@@ -340,7 +340,7 @@ impl Volume {
                 path: Arc::new(
                     volume_path
                         .to_str()
-                        .ok_or(naive!("{:?} to string", volume_path))?
+                        .ok_or(storage_error!("parse volume path: {:?}", volume_path))?
                         .to_owned(),
                 ),
                 max_length: AtomicU64::new(size),
@@ -372,13 +372,13 @@ impl Volume {
                 last_index.offset,
                 last_index.length
             );
-            return Err(Error::volume(error::VolumeError::data_corruption(
-                id as u32,
-                format!(
-                    "volume current length: {}, last_index.offset: {}, last_index.length: {}",
-                    current_length, last_index.offset, last_index.length
-                ),
-            )));
+            return Err(storage_error!(
+                "volume: {}, current length: {}, last_index.offset: {}, last_index.length: {}",
+                id,
+                current_length,
+                last_index.offset,
+                last_index.length
+            ));
         }
 
         let super_block = SuperBlock::read_from(&mut writable_file)?;
@@ -402,12 +402,10 @@ impl Volume {
     fn parse_volume_file_stem_name(volume_path: &Path) -> Result<u32> {
         let file_stem = volume_path
             .file_stem()
-            .ok_or(Error::path(format!("get file_stem from {:?}", volume_path)))?;
-        let file_stem_str = file_stem.to_str().ok_or(Error::parse(
-            "&std::ffi::OsStr",
-            "&str",
-            format!("{:?}", file_stem),
-        ))?;
+            .ok_or(error!("get file_stem from {:?}", volume_path))?;
+        let file_stem_str = file_stem
+            .to_str()
+            .ok_or(error!("&std::ffi::OsStr -> &str. {:?}", file_stem))?;
         let id = file_stem_str.parse::<u32>()?;
         Ok(id)
     }
@@ -502,12 +500,13 @@ impl Volume {
                actual_data_length,
                total_length
             );
-            return Err(Error::volume(error::VolumeError::overflow(
-                self.id() as u32,
+            return Err(storage_error!(
+                "overflow. id: {}, max length: {}, current: {}, to be written: {}",
+                self.id(),
                 self.max_length(),
                 self.current_length(),
-                total_length as u64,
-            )));
+                total_length
+            ));
         }
         let mut received_length = 0usize;
 
@@ -536,12 +535,13 @@ impl Volume {
                 actual_data_length,
                 total_length,
             );
-            return Err(Error::volume(error::VolumeError::write_length_mismatch(
-                self.id() as u32,
-                needle_id.to_string(),
-                actual_data_length,
+            return Err(storage_error!(
+                "write length not matched. volume: {}, needle: {}, recv: {}, write: {}",
+                self.id(),
+                needle_id,
                 received_length,
-            )));
+                actual_data_length
+            ));
         }
 
         let index = Index::new(
@@ -567,7 +567,7 @@ impl Volume {
 
     pub async fn write_needle2(&mut self, needle: weaver_proto::weaver::Needle) -> Result<()> {
         if needle.header.is_none() {
-            return Err(boxed_naive!("failed to write empty needle"));
+            return Err(error!("failed to write empty needle"));
         }
         self._write_needle(&needle).await?;
         self._write_index(&needle).await?;
@@ -628,10 +628,11 @@ impl Volume {
         let indexes = self.indexes.read().unwrap();
         let index: RawIndex = indexes
             .get(&needle_id)
-            .ok_or(Error::not_found(format!(
+            .ok_or(storage_error!(
                 "needle not in indexes: {}, indexes: {:?}",
-                needle_id, self.indexes
-            )))?
+                needle_id,
+                self.indexes
+            ))?
             .clone();
         log::debug!("index: {:?}", index);
         if ((index.offset + index.length) as u64) > self.current_length() {
@@ -642,10 +643,11 @@ impl Volume {
                 index.offset,
                 index.length
             );
-            return Err(Error::data_corruption(
-                needle_id.to_string(),
-                "index out of current length",
-            ));
+            return Err(storage_error!("data corruption. needle: {}", needle_id));
+            // return Err(Error::data_corruption(
+            //     needle_id.to_string(),
+            //     "index out of current length",
+            // ));
         }
         Ok(self.read_needle(&index)?)
     }
@@ -697,7 +699,7 @@ impl Volume {
                         // if the [`Receiver`] has disconnected and is no longer able to
                         // receive information.
                         log::error!("failed to read from volume. error: {:?}", e);
-                        match tx.send(Err(Error::io(e))) {
+                        match tx.send(Err(external_error!(e))) {
                             Ok(_) => {}
                             Err(send_error) => {
                                 log::error!("failed to send error into channel. {:?}", send_error);
@@ -711,7 +713,7 @@ impl Volume {
                     Ok(_) => {}
                     Err(e) => {
                         log::error!("failed to read from volume. error: {:?}", e);
-                        match tx.send(Err(Error::channel(e.description()))) {
+                        match tx.send(Err(external_error!(e))) {
                             Ok(_) => {}
                             Err(send_error) => {
                                 log::error!("failed to send error into channel. {:?}", send_error);

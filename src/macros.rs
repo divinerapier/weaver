@@ -1,55 +1,34 @@
 #[macro_export]
-macro_rules! boxed_naive {
+macro_rules! error {
     ($($arg:tt)*) => {
-        crate::error::Error::naive(format!($($arg)*))
+        crate::error::Error::normal(format!($($arg)*))
     };
 }
 
 #[macro_export]
-macro_rules! naive {
+macro_rules! external_error {
+    ($arg:tt) => {
+        crate::error::Error::dependency($arg)
+    };
+}
+
+#[macro_export]
+macro_rules! master_error {
     ($($arg:tt)*) => {
-        crate::error::Error::Naive(format!($($arg)*))
+        crate::error::Error::master(format!($($arg)*))
     };
 }
 
 #[macro_export]
-macro_rules! boxed_volume_not_found {
-    ($arg:tt) => {
-        crate::error::Error::volume(crate::error::VolumeError::not_found($arg))
+macro_rules! directory_error {
+    ($($arg:tt)*) => {
+        crate::error::Error::directory(format!($($arg)*))
     };
 }
 
 #[macro_export]
-macro_rules! volume_not_found {
-    ($arg:tt) => {
-        crate::error::Error::Volume(crate::error::VolumeError::not_found($arg))
-    };
-}
-
-#[macro_export]
-macro_rules! boxed_no_writable_volumes {
-    () => {
-        crate::error::Error::directory(crate::error::DirectoryError::GetWritableVolume)
-    };
-}
-
-#[macro_export]
-macro_rules! no_writable_volumes {
-    () => {
-        crate::error::Error::Directory(crate::error::DirectoryError::GetWritableVolume)
-    };
-}
-
-#[macro_export]
-macro_rules! boxed_volume_create {
-    ($arg:tt, $cause:tt) => {
-        crate::error::Error::volume(crate::error::VolumeError::create($arg, $cause))
-    };
-}
-
-#[macro_export]
-macro_rules! boxed_index_create {
-    ($arg:tt, $cause:tt) => {
-        crate::error::Error::index(crate::error::IndexError::create($arg, $cause))
+macro_rules! storage_error {
+    ($($arg:tt)*) => {
+        crate::error::Error::storage(format!($($arg)*))
     };
 }

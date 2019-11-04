@@ -42,7 +42,7 @@ impl Router {
         let node_indexes = self
             .volumes
             .get(&volume_id)
-            .ok_or(boxed_naive!("volume: {} not found", volume_id))?;
+            .ok_or(error!("volume: {} not found", volume_id))?;
         let mut result = vec![];
         for node_index in node_indexes {
             match self.nodes.get(node_index) {
@@ -63,7 +63,7 @@ impl Router {
         let diff_node = replica_replacement.node_count;
 
         if diff_node == 0 || diff_rack == 0 || diff_cent == 0 {
-            return Err(boxed_naive!(
+            return Err(error!(
                 "invalid replica_replacement: {:?}",
                 replica_replacement
             ));
