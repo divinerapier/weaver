@@ -156,15 +156,59 @@ impl Storage {
             .map(|(index, volume_result)| (index, volume_result.unwrap()))
             .collect::<HashMap<u64, Volume>>();
 
+        let writable_volumes = volumes
+            .iter()
+            .filter(|(_, volume)| {
+                let volume: &Volume = volume;
+                volume.writable()
+            })
+            .map(|(volume_id, _)| *volume_id)
+            .collect::<HashSet<u64>>();
+        let readonly_volumes = volumes
+            .iter()
+            .filter(|(_, volume)| {
+                let volume: &Volume = volume;
+                !volume.writable()
+            })
+            .map(|(volume_id, _)| *volume_id)
+            .collect::<HashSet<u64>>();
+
         Ok(Storage {
             directory: PathBuf::from(dir),
             volumes,
             ip: ip.to_owned(),
             port,
             latest_volume_id,
-            writable_volumes: HashSet::new(),
-            readonly_volumes: HashSet::new(),
+            writable_volumes,
+            readonly_volumes,
         })
+    }
+
+    pub fn create_volume(
+        &mut self,
+        volume_id: u64,
+        replica_replacement: Option<volume::ReplicaReplacement>,
+        max_volume_size: u32,
+        max_needle_count: u32,
+    ) -> Result<()> {
+        if self.volumes.contains_key(&volume_id) {
+            return Err(boxed_naive!(
+                "failed to create an exists volume {}",
+                volume_id
+            ));
+        }
+        let super_block =
+            volume::SuperBlock::new(replica_replacement, max_volume_size, max_needle_count);
+        let volume = Volume::new2(&self.directory, volume_id as u32, 128, &super_block)?;
+
+        if volume.writable() {
+            self.writable_volumes.insert(volume_id);
+        } else {
+            self.readonly_volumes.insert(volume_id);
+        }
+        self.volumes.insert(volume_id, volume);
+
+        Ok(())
     }
 
     pub fn read_needle(&self, volume_id: u32, needle_id: u64) -> Result<Needle> {

@@ -101,6 +101,22 @@ impl weaver_proto::storage::server::Storage for StorageService {
         &self,
         request: tonic::Request<weaver_proto::storage::AllocateVolumeRequest>,
     ) -> Result<tonic::Response<weaver_proto::storage::AllocateVolumeResponse>, tonic::Status> {
+        let request: weaver_proto::storage::AllocateVolumeRequest = request.into_inner();
+
+        let mut storage = self.storage.write().unwrap();
+
+        let replica_replacement = request.replica_replacement.map(|rr| weaver::storage::volume::ReplicaReplacement::from(rr));
+
+        match storage.create_volume (
+            request.volume_id as u64,
+            replica_replacement,
+            128,
+            128,
+        ) {
+            Ok(_) => {},
+            Err(_) => {},
+        }
+
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
 

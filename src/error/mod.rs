@@ -197,3 +197,9 @@ impl From<mpsc::SendError<Result<bytes::Bytes>>> for Box<Error> {
         Error::Channel(format!("send bytes. {:?}", e)).into()
     }
 }
+
+impl From<Error> for tonic::Status {
+    fn from(e: Error) -> Self {
+        tonic::Status::new(tonic::Code::Unknown, e.to_string())
+    }
+}
