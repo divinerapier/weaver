@@ -104,17 +104,23 @@ impl weaver_proto::storage::server::Storage for StorageService {
         let request: weaver_proto::storage::AllocateVolumeRequest = request.into_inner();
 
         let mut storage = self.storage.write().unwrap();
+        let volume_id = request.volume_id as u64;
+        if storage.volumes.contains_key(&volume_id) {
+            return Err(tonic::Status::new(
+                tonic::Code::Unknown,
+                format!("duplicated volume: {}", volume_id),
+            ));
+        }
 
         let replica_replacement = request
             .replica_replacement
             .map(|rr| weaver::storage::volume::ReplicaReplacement::from(rr));
 
-        match storage.create_volume(request.volume_id as u64, replica_replacement, 128, 128) {
-            Ok(_) => {}
-            Err(_) => {}
-        }
+        storage.create_volume(volume_id as u64, replica_replacement, 128, 128)?;
 
-        Err(tonic::Status::unimplemented("Not yet implemented"))
+        Ok(tonic::Response::new(weaver_proto::storage::AllocateVolumeResponse{
+            status: None,
+        }))
     }
 
     async fn volume_sync_status(
