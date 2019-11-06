@@ -25,6 +25,41 @@ impl StorageService {
 
 #[tonic::async_trait]
 impl weaver_proto::storage::server::Storage for StorageService {
+    /// Create a new volume.
+    async fn allocate_volume(
+        &self,
+        request: tonic::Request<weaver_proto::storage::AllocateVolumeRequest>,
+    ) -> Result<tonic::Response<weaver_proto::storage::AllocateVolumeResponse>, tonic::Status> {
+        let request: weaver_proto::storage::AllocateVolumeRequest = request.into_inner();
+
+        let mut storage = self.storage.write().unwrap();
+        let volume_id = request.volume_id as u64;
+        if storage.volumes.contains_key(&volume_id) {
+            return Err(tonic::Status::new(
+                tonic::Code::Unknown,
+                format!("duplicated volume: {}", volume_id),
+            ));
+        }
+
+        let replica_replacement = request
+            .replica_replacement
+            .map(|rr| weaver::storage::volume::ReplicaReplacement::from(rr));
+
+        storage.create_volume(volume_id as u64, replica_replacement, 128, 128)?;
+
+        Ok(tonic::Response::new(
+            weaver_proto::storage::AllocateVolumeResponse { status: None },
+        ))
+    }
+
+    /// Write the needle to a volume.
+    async fn write_needle(
+        &self,
+        request: tonic::Request<tonic::Streaming<weaver_proto::storage::WriteNeedleRequest>>,
+    ) -> Result<tonic::Response<weaver_proto::storage::WriteNeedleResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("Not yet implemented"))
+    }
+
     #[doc = "Server streaming response type for the VolumeIncrementalCopy method."]
     type VolumeIncrementalCopyStream = tokio::sync::mpsc::Receiver<
         Result<weaver_proto::storage::VolumeIncrementalCopyResponse, Status>,
@@ -95,32 +130,6 @@ impl weaver_proto::storage::server::Storage for StorageService {
     ) -> Result<tonic::Response<weaver_proto::storage::DeleteCollectionResponse>, tonic::Status>
     {
         Err(tonic::Status::unimplemented("Not yet implemented"))
-    }
-
-    async fn allocate_volume(
-        &self,
-        request: tonic::Request<weaver_proto::storage::AllocateVolumeRequest>,
-    ) -> Result<tonic::Response<weaver_proto::storage::AllocateVolumeResponse>, tonic::Status> {
-        let request: weaver_proto::storage::AllocateVolumeRequest = request.into_inner();
-
-        let mut storage = self.storage.write().unwrap();
-        let volume_id = request.volume_id as u64;
-        if storage.volumes.contains_key(&volume_id) {
-            return Err(tonic::Status::new(
-                tonic::Code::Unknown,
-                format!("duplicated volume: {}", volume_id),
-            ));
-        }
-
-        let replica_replacement = request
-            .replica_replacement
-            .map(|rr| weaver::storage::volume::ReplicaReplacement::from(rr));
-
-        storage.create_volume(volume_id as u64, replica_replacement, 128, 128)?;
-
-        Ok(tonic::Response::new(weaver_proto::storage::AllocateVolumeResponse{
-            status: None,
-        }))
     }
 
     async fn volume_sync_status(

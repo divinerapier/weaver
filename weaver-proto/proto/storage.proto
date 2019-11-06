@@ -6,6 +6,7 @@ import "weaver.proto";
 
 service Storage {
   rpc AllocateVolume(AllocateVolumeRequest) returns (AllocateVolumeResponse) {}
+  rpc WriteNeedle(stream WriteNeedleRequest) returns (WriteNeedleResponse) {}
 
   // Experts only: takes multiple fid parameters. This function does not
   // propagate deletes to replicas.
@@ -76,6 +77,14 @@ message AllocateVolumeRequest {
 }
 
 message AllocateVolumeResponse { weaver.Status status = 1; }
+
+message WriteNeedleRequest {
+  uint64 volume_id = 1;
+  uint64 needle_id = 2;
+  bytes content = 3;
+}
+
+message WriteNeedleResponse {}
 
 message BatchDeleteRequest { repeated string file_ids = 1; }
 
