@@ -565,16 +565,16 @@ impl Volume {
         Ok(())
     }
 
-    pub async fn write_needle2(&mut self, needle: weaver_proto::weaver::Needle) -> Result<()> {
+    pub fn write_needle2(&mut self, needle: &weaver_proto::weaver::Needle) -> Result<()> {
         if needle.header.is_none() {
             return Err(error!("failed to write empty needle"));
         }
-        self._write_needle(&needle).await?;
-        self._write_index(&needle).await?;
+        self._write_needle(&needle)?;
+        self._write_index(&needle)?;
         Ok(())
     }
 
-    async fn _write_needle(&mut self, needle: &weaver_proto::weaver::Needle) -> Result<()> {
+    fn _write_needle(&mut self, needle: &weaver_proto::weaver::Needle) -> Result<()> {
         let header = needle.header.as_ref().unwrap();
         let body: &[u8] = &needle.body;
 
@@ -599,7 +599,7 @@ impl Volume {
         }
     }
 
-    async fn _write_index(&mut self, needle: &weaver_proto::weaver::Needle) -> Result<()> {
+    fn _write_index(&mut self, needle: &weaver_proto::weaver::Needle) -> Result<()> {
         let needle = needle.header.as_ref().unwrap();
         let index = Index::new(
             needle.id,

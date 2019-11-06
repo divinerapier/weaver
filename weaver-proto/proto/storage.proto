@@ -80,7 +80,7 @@ message AllocateVolumeResponse { weaver.Status status = 1; }
 
 message WriteNeedleRequest {
   uint64 volume_id = 1;
-  uint64 needle_id = 2;
+  weaver.NeedleHeader needle_header = 2;
   bytes content = 3;
 }
 

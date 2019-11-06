@@ -21,3 +21,5 @@ impl weaver::ReplicaReplacement {
         self.data_center_count as usize * self.rack_count as usize * self.node_count as usize
     }
 }
+
+impl std::cmp::Eq for weaver::NeedleHeader {}

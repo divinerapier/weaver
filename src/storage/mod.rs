@@ -1,14 +1,15 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 
 use crate::error::Result;
 use crate::needle::Needle;
-use volume::Volume;
+pub use volume::Volume;
 
 pub mod volume;
 
 /// Storage consists of many volumes.
-pub struct Storage {
+struct StorageImpl {
     pub directory: PathBuf,
 
     /// all volumes on storage
@@ -24,6 +25,10 @@ pub struct Storage {
 
     pub writable_volumes: HashSet<u64>,
     pub readonly_volumes: HashSet<u64>,
+}
+
+pub struct Storage {
+    inner: RwLock<StorageImpl>,
 }
 
 impl Storage {
@@ -86,13 +91,15 @@ impl Storage {
             .collect::<HashMap<u64, Volume>>();
 
         Ok(Storage {
-            directory: PathBuf::from(dir),
-            volumes,
-            ip: ip.to_owned(),
-            port,
-            latest_volume_id,
-            writable_volumes: HashSet::new(),
-            readonly_volumes: HashSet::new(),
+            inner: RwLock::new(StorageImpl {
+                directory: PathBuf::from(dir),
+                volumes,
+                ip: ip.to_owned(),
+                port,
+                latest_volume_id,
+                writable_volumes: HashSet::new(),
+                readonly_volumes: HashSet::new(),
+            }),
         })
     }
 
@@ -174,46 +181,62 @@ impl Storage {
             .collect::<HashSet<u64>>();
 
         Ok(Storage {
-            directory: PathBuf::from(dir),
-            volumes,
-            ip: ip.to_owned(),
-            port,
-            latest_volume_id,
-            writable_volumes,
-            readonly_volumes,
+            inner: RwLock::new(StorageImpl {
+                directory: PathBuf::from(dir),
+                volumes,
+                ip: ip.to_owned(),
+                port,
+                latest_volume_id,
+                writable_volumes,
+                readonly_volumes,
+            }),
         })
     }
 
     pub fn create_volume(
-        &mut self,
+        &self,
         volume_id: u64,
         replica_replacement: Option<volume::ReplicaReplacement>,
         max_volume_size: u32,
         max_needle_count: u32,
     ) -> Result<()> {
-        if self.volumes.contains_key(&volume_id) {
+        let mut storage = self.inner.write().unwrap();
+        if storage.volumes.contains_key(&volume_id) {
             return Err(error!("failed to create an exists volume {}", volume_id));
         }
         let super_block =
             volume::SuperBlock::new(replica_replacement, max_volume_size, max_needle_count);
-        let volume = Volume::new2(&self.directory, volume_id as u32, 128, &super_block)?;
+        let volume = Volume::new2(&storage.directory, volume_id as u32, 128, &super_block)?;
 
         if volume.writable() {
-            self.writable_volumes.insert(volume_id);
+            storage.writable_volumes.insert(volume_id);
         } else {
-            self.readonly_volumes.insert(volume_id);
+            storage.readonly_volumes.insert(volume_id);
         }
-        self.volumes.insert(volume_id, volume);
+        storage.volumes.insert(volume_id, volume);
 
         Ok(())
     }
 
+    pub async fn write_needle(
+        &self,
+        volume_id: u64,
+        needle: &weaver_proto::weaver::Needle,
+    ) -> Result<()> {
+        let mut storage = self.inner.write().unwrap();
+        match storage.volumes.get_mut(&volume_id) {
+            Some(volume) => Ok(volume.write_needle2(needle)?),
+            None => Err(storage_error!("volume not found: {}", volume_id)),
+        }
+    }
+
     pub fn read_needle(&self, volume_id: u32, needle_id: u64) -> Result<Needle> {
-        if volume_id as usize >= self.volumes.len() {
+        let storage = self.inner.read().unwrap();
+        if volume_id as usize >= storage.volumes.len() {
             // FIXME: index out of range
             return Err(error!("volume not found"));
         }
-        let volume: &Volume = &self.volumes[&(volume_id as u64)];
+        let volume: &Volume = &storage.volumes[&(volume_id as u64)];
         volume.get(needle_id)
     }
 }

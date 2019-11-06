@@ -10,15 +10,14 @@ use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 
 // clone trait required by `fn create_directory`, so inner fields must be arc
-#[derive(Clone)]
 pub struct StorageService {
-    storage: Arc<RwLock<Storage>>,
+    storage: Storage,
 }
 
 impl StorageService {
     pub fn new(dir: &str, ip: &str, port: u16) -> StorageService {
         StorageService {
-            storage: Arc::new(RwLock::new(Storage::new(dir, ip, port).unwrap())),
+            storage: Storage::new(dir, ip, port).unwrap(),
         }
     }
 }
@@ -32,24 +31,26 @@ impl weaver_proto::storage::server::Storage for StorageService {
     ) -> Result<tonic::Response<weaver_proto::storage::AllocateVolumeResponse>, tonic::Status> {
         let request: weaver_proto::storage::AllocateVolumeRequest = request.into_inner();
 
-        let mut storage = self.storage.write().unwrap();
-        let volume_id = request.volume_id as u64;
-        if storage.volumes.contains_key(&volume_id) {
-            return Err(tonic::Status::new(
-                tonic::Code::Unknown,
-                format!("duplicated volume: {}", volume_id),
-            ));
-        }
+        // let mut storage = self.storage.write().unwrap();
+        // let volume_id = request.volume_id as u64;
+        // if storage.volumes.contains_key(&volume_id) {
+        //     return Err(tonic::Status::new(
+        //         tonic::Code::Unknown,
+        //         format!("duplicated volume: {}", volume_id),
+        //     ));
+        // }
 
-        let replica_replacement = request
-            .replica_replacement
-            .map(|rr| weaver::storage::volume::ReplicaReplacement::from(rr));
+        // let replica_replacement = request
+        //     .replica_replacement
+        //     .map(|rr| weaver::storage::volume::ReplicaReplacement::from(rr));
 
-        storage.create_volume(volume_id as u64, replica_replacement, 128, 128)?;
+        // storage.create_volume(volume_id as u64, replica_replacement, 128, 128)?;
 
-        Ok(tonic::Response::new(
-            weaver_proto::storage::AllocateVolumeResponse { status: None },
-        ))
+        // Ok(tonic::Response::new(
+        //     weaver_proto::storage::AllocateVolumeResponse { status: None },
+        // ))
+
+        Err(tonic::Status::unimplemented("Not yet implemented"))
     }
 
     /// Write the needle to a volume.
@@ -57,7 +58,86 @@ impl weaver_proto::storage::server::Storage for StorageService {
         &self,
         request: tonic::Request<tonic::Streaming<weaver_proto::storage::WriteNeedleRequest>>,
     ) -> Result<tonic::Response<weaver_proto::storage::WriteNeedleResponse>, tonic::Status> {
-        Err(tonic::Status::unimplemented("Not yet implemented"))
+        let stream = request.into_inner();
+        futures::pin_mut!(stream);
+
+        fn check_and_set<T>(old: &mut Option<T>, new: &Option<T>) -> weaver::error::Result<()>
+        where
+            T: Eq + PartialEq + Clone + std::fmt::Debug,
+        {
+            if new.is_none() {
+                return Err(weaver::error!("invalid volume id or needle id"));
+            }
+
+            match old {
+                Some(old) => {
+                    let new = new.as_ref().unwrap();
+                    let old: &T = old;
+                    if !old.eq(new) {
+                        return Err(weaver::error!(
+                            "mismatched volume or needle. old: {:?}, new: {:?}",
+                            old,
+                            new
+                        ));
+                    }
+                }
+                old @ None => {
+                    //*old = Some(new.clone()),
+                    *old = new.clone()
+                }
+            }
+            Ok(())
+        };
+
+        let mut volume_id: Option<u64> = None;
+        let mut needle_header: Option<weaver_proto::weaver::NeedleHeader> = None;
+        let mut buffer = Vec::with_capacity(32 * 1024 * 1024);
+        while let Some(request) = stream.next().await {
+            let request: weaver_proto::storage::WriteNeedleRequest = request?;
+            check_and_set::<u64>(
+                &mut volume_id,
+                &if request.volume_id == 0 {
+                    None
+                } else {
+                    Some(request.volume_id)
+                },
+            )?;
+            check_and_set::<weaver_proto::weaver::NeedleHeader>(
+                &mut needle_header,
+                &request.needle_header,
+            )?;
+            buffer.extend_from_slice(&request.content);
+        }
+
+        if volume_id.is_none() {
+            return Err(tonic::Status::new(
+                tonic::Code::InvalidArgument,
+                "missing volume id",
+            ));
+        }
+
+        if needle_header.is_none() {
+            return Err(tonic::Status::new(
+                tonic::Code::InvalidArgument,
+                "missing needle id",
+            ));
+        }
+
+        let volume_id = volume_id.unwrap();
+        let needle_header = needle_header.unwrap();
+
+        self.storage
+            .write_needle(
+                0,
+                &weaver_proto::weaver::Needle {
+                    header: Some(needle_header),
+                    body: buffer,
+                },
+            )
+            .await?;
+        Ok(tonic::Response::new(
+            weaver_proto::storage::WriteNeedleResponse {},
+        ))
     }
 
     #[doc = "Server streaming response type for the VolumeIncrementalCopy method."]
