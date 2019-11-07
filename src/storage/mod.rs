@@ -196,7 +196,7 @@ impl Storage {
     pub fn create_volume(
         &self,
         volume_id: u64,
-        replica_replacement: Option<volume::ReplicaReplacement>,
+        replica_replacement: &Option<volume::ReplicaReplacement>,
         max_volume_size: u32,
         max_needle_count: u32,
     ) -> Result<()> {
@@ -205,7 +205,7 @@ impl Storage {
             return Err(error!("failed to create an exists volume {}", volume_id));
         }
         let super_block =
-            volume::SuperBlock::new(replica_replacement, max_volume_size, max_needle_count);
+            volume::SuperBlock::new(&replica_replacement, max_volume_size, max_needle_count);
         let volume = Volume::new2(&storage.directory, volume_id as u32, 128, &super_block)?;
 
         if volume.writable() {

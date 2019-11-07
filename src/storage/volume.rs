@@ -133,7 +133,7 @@ impl Default for SuperBlock {
 
 impl SuperBlock {
     pub fn new(
-        replica_replacement: Option<ReplicaReplacement>,
+        replica_replacement: &Option<ReplicaReplacement>,
         max_volume_size: u32,
         max_needle_count: u32,
     ) -> SuperBlock {

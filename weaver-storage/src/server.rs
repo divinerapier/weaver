@@ -31,26 +31,16 @@ impl weaver_proto::storage::server::Storage for StorageService {
     ) -> Result<tonic::Response<weaver_proto::storage::AllocateVolumeResponse>, tonic::Status> {
         let request: weaver_proto::storage::AllocateVolumeRequest = request.into_inner();
 
-        // let mut storage = self.storage.write().unwrap();
-        // let volume_id = request.volume_id as u64;
-        // if storage.volumes.contains_key(&volume_id) {
-        //     return Err(tonic::Status::new(
-        //         tonic::Code::Unknown,
-        //         format!("duplicated volume: {}", volume_id),
-        //     ));
-        // }
+        let replica_replacement = request
+            .replica_replacement
+            .map(|rr| weaver::storage::volume::ReplicaReplacement::from(rr));
 
-        // let replica_replacement = request
-        //     .replica_replacement
-        //     .map(|rr| weaver::storage::volume::ReplicaReplacement::from(rr));
+        self.storage
+            .create_volume(request.volume_id as u64, &replica_replacement, 128, 128)?;
 
-        // storage.create_volume(volume_id as u64, replica_replacement, 128, 128)?;
-
-        // Ok(tonic::Response::new(
-        //     weaver_proto::storage::AllocateVolumeResponse { status: None },
-        // ))
-
-        Err(tonic::Status::unimplemented("Not yet implemented"))
+        Ok(tonic::Response::new(
+            weaver_proto::storage::AllocateVolumeResponse { status: None },
+        ))
     }
 
     /// Write the needle to a volume.
