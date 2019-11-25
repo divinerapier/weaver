@@ -1,8 +1,8 @@
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
-use weaver::error::Error;
-use weaver::needle::Needle;
-use weaver::storage::Storage;
+use crate::error::Error;
+use crate::needle::Needle;
+use crate::storage::Storage;
 
 use futures::{Stream, StreamExt};
 use tokio::sync::mpsc;
@@ -33,7 +33,7 @@ impl weaver_proto::storage::server::Storage for StorageService {
 
         let replica_replacement = request
             .replica_replacement
-            .map(|rr| weaver::storage::volume::ReplicaReplacement::from(rr));
+            .map(|rr| super::volume::ReplicaReplacement::from(rr));
 
         self.storage
             .create_volume(request.volume_id as u64, &replica_replacement, 128, 128)?;
@@ -51,12 +51,12 @@ impl weaver_proto::storage::server::Storage for StorageService {
         let stream = request.into_inner();
         futures::pin_mut!(stream);
 
-        fn check_and_set<T>(old: &mut Option<T>, new: &Option<T>) -> weaver::error::Result<()>
+        fn check_and_set<T>(old: &mut Option<T>, new: &Option<T>) -> crate::error::Result<()>
         where
             T: Eq + PartialEq + Clone + std::fmt::Debug,
         {
             if new.is_none() {
-                return Err(weaver::error!("invalid volume id or needle id"));
+                return Err(crate::error!("invalid volume id or needle id"));
             }
 
             match old {
@@ -64,7 +64,7 @@ impl weaver_proto::storage::server::Storage for StorageService {
                     let new = new.as_ref().unwrap();
                     let old: &T = old;
                     if !old.eq(new) {
-                        return Err(weaver::error!(
+                        return Err(crate::error!(
                             "mismatched volume or needle. old: {:?}, new: {:?}",
                             old,
                             new

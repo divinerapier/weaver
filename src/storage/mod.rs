@@ -6,6 +6,7 @@ use crate::error::Result;
 use crate::needle::Needle;
 pub use volume::Volume;
 
+pub mod server;
 pub mod volume;
 
 /// Storage consists of many volumes.

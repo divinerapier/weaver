@@ -1,6 +1,3 @@
-mod client;
-mod server;
-
 use clap::App;
 use clap::Arg;
 
@@ -39,11 +36,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     log::set_max_level(log::LevelFilter::max());
-    let svc = weaver_proto::storage::server::StorageServer::new(server::StorageService::new(
-        "/data/weaver/",
-        ip,
-        port,
-    ));
+    let svc = weaver_proto::storage::server::StorageServer::new(
+        weaver::storage::server::StorageService::new("/data/weaver/", ip, port),
+    );
     tonic::transport::Server::builder()
         .serve(format!("{}:{}", ip, port).parse().unwrap(), svc)
         .await?;
