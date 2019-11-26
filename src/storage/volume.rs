@@ -58,6 +58,10 @@ impl ReplicaReplacement {
     pub fn replica_count(&self) -> usize {
         self.data_center_count as usize * self.rack_count as usize * self.node_count as usize
     }
+
+    pub fn is_valid(&self) -> bool {
+        self.data_center_count > 0 && self.rack_count > 0 && self.node_count > 0
+    }
 }
 
 impl From<weaver_proto::weaver::ReplicaReplacement> for ReplicaReplacement {
