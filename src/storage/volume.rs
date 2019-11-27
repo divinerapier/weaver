@@ -67,9 +67,9 @@ impl ReplicaReplacement {
 impl From<weaver_proto::weaver::ReplicaReplacement> for ReplicaReplacement {
     fn from(rr: weaver_proto::weaver::ReplicaReplacement) -> Self {
         ReplicaReplacement {
-            data_center_count: (rr.data_center_count & 0xf) as u8,
-            rack_count: (rr.rack_count & 0xf) as u8,
-            node_count: (rr.node_count & 0xf) as u8,
+            data_center_count: (rr.data_center_count & 0xff) as u8,
+            rack_count: (rr.rack_count & 0xff) as u8,
+            node_count: (rr.node_count & 0xff) as u8,
         }
     }
 }
