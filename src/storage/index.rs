@@ -3,6 +3,7 @@ use crate::error::Result;
 
 use std::collections::HashMap;
 use std::io::Write;
+use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use byteorder::ByteOrder;
@@ -45,7 +46,9 @@ impl Codec for BinaryCodec {
 
 pub struct Index<C: Codec> {
     writer: Arc<Mutex<std::fs::File>>,
+    reader: std::fs::File,
     indexes: Arc<RwLock<HashMap<u64, Entry>>>,
+    last: AtomicPtr<Option<Entry>>,
     codec: C,
 }
 
@@ -59,16 +62,22 @@ impl<C: Codec> Index<C> {
             .open(path.as_ref())?;
         let mut indexes = HashMap::new();
         let reader = file.try_clone()?;
+        let cloned_file = file.try_clone()?;
+
+        let mut last_index = None;
 
         let indexes_reader = serde_json::Deserializer::from_reader(reader).into_iter::<Entry>();
         for index_result in indexes_reader {
             let index = index_result?;
             indexes.insert(index.needle_id, index);
+            last_index = Some(index);
         }
 
         Ok(Index {
+            reader: cloned_file,
             writer: Arc::new(Mutex::new(file)),
             indexes: Arc::new(RwLock::new(indexes)),
+            last: AtomicPtr::new(&mut last_index as *mut Option<Entry>),
             codec,
         })
     }
@@ -85,6 +94,8 @@ impl<C: Codec> Index<C> {
                 std::collections::HashMap<u64, Entry>,
             > = self.indexes.write().unwrap();
             indexes.insert(entry.needle_id, entry.clone());
+            let mut entry = Some(entry.clone());
+            self.last.store(&mut entry as *mut Option<Entry>, Ordering::SeqCst);
         }
         Ok(())
     }
@@ -94,6 +105,13 @@ impl<C: Codec> Index<C> {
         match indexes.get(&needle_id) {
             Some(entry) => Ok(entry.clone()),
             None => Err(storage_error!("not found needle: {}", needle_id)),
+        }
+    }
+
+    pub fn last_index(&self) -> Box<Option<Entry>> {
+        let entry: *mut Option<Entry> = self.last.load(Ordering::SeqCst);
+        unsafe {
+            Box::from_raw(entry)
         }
     }
 }

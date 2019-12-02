@@ -1,4 +1,4 @@
-use crate::error::{self, Error, Result};
+use crate::error::Result;
 use crate::needle::{Needle, NeedleBody, NeedleHeader};
 use crate::utils;
 
@@ -7,9 +7,7 @@ use super::index::Entry as IndexEntry;
 use bytes::ByteOrder;
 
 use std::collections::HashMap;
-use std::error::Error as StdError;
 use std::ffi::OsStr;
-use std::fmt::Display;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -18,7 +16,6 @@ use std::sync::{
     Arc, Mutex, RwLock,
 };
 
-use serde::Serialize;
 use serde_json::Deserializer;
 
 pub enum VolumeExtension {
@@ -92,8 +89,6 @@ pub struct Volume<C: super::index::Codec> {
     pub readonly_volume: Arc<File>,
     pub current_length: AtomicU64,
     pub index: super::index::Index<C>,
-    // pub index_file: Arc<Mutex<File>>,
-    // pub indexes: Arc<RwLock<HashMap<u64, IndexEntry>>>,
 }
 
 unsafe impl<C: super::index::Codec> Send for Volume<C> {}
@@ -198,12 +193,6 @@ impl From<&[u8]> for SuperBlock {
     }
 }
 
-// impl <C> Display for Volume<C> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         write!(f, "{}", self)
-//     }
-// }
-
 impl<C> Volume<C>
 where
     C: super::index::Codec,
@@ -213,19 +202,20 @@ where
         let index_path: PathBuf = dir.join(format!("{}.index", id));
         if volume_path.exists() {
             log::error!(
-                "couldn't create the volume data on an exists path. path: {}",
+                "couldn't create the volume on an existing path. path: {}",
                 volume_path.display()
             );
             return Err(storage_error!("exists volume data: {}", id));
         }
         if index_path.exists() {
             log::error!(
-                "couldn't create the volume index on an exists path. path: {}",
+                "couldn't create the volume on an existing path. path: {}",
                 index_path.display()
             );
             return Err(storage_error!("exists volume index: {}", id));
         }
-        // let (index_file, index_map, _) = Self::open_indexes(index_path, true)?;
+
+        let index = super::index::Index::new(&index_path, codec)?;
         let (readonly_file, writable_file) = Self::open_volumes(&volume_path, true)?;
         let current_length = writable_file.metadata()?.len();
         Ok(Volume {
@@ -243,7 +233,7 @@ where
             writable_volume: Arc::new(Mutex::new(writable_file)),
             readonly_volume: Arc::new(readonly_file),
             current_length: AtomicU64::new(current_length),
-            index: super::index::Index::new(&index_path, codec)?,
+            index,
         })
     }
 
@@ -268,7 +258,13 @@ where
         let index_file_str = naive_volume_path_str.to_owned() + "index";
         let volume_file_str = naive_volume_path_str.to_owned() + "data";
 
-        let (_, _, last_index) = Self::open_indexes(&index_file_str, false)?;
+        // let (_, _, last_index) = Self::open_indexes(&index_file_str, false)?;
+        let index = super::index::Index::new(&index_file_str, codec)?;
+        let last_index = match *index.last_index() {
+            Some(last_index) => last_index,
+            None => super::index::Entry::default(),
+        };
+
         let (readonly_file, writable_file) = Self::open_volumes(volume_file_str, false)?;
         let current_length = writable_file.metadata()?.len();
         if current_length != (last_index.offset + last_index.length) as u64 {
@@ -303,9 +299,7 @@ where
             writable_volume: Arc::new(Mutex::new(writable_file)),
             readonly_volume: Arc::new(readonly_file),
             current_length: AtomicU64::new(current_length),
-            index: super::index::Index::new(index_file_str, codec)?,
-            // index_file: Arc::new(Mutex::new(index_file)),
-            // indexes: Arc::new(RwLock::new(index_map)),
+            index,
         })
     }
 
