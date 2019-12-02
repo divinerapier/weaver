@@ -2,7 +2,6 @@
 pub mod macros;
 
 pub mod directory;
-pub mod directory2;
 pub mod error;
 pub mod index;
 pub mod master;

@@ -6,26 +6,33 @@ use std::sync::{
 };
 use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
-pub struct DirectoryService {
+pub struct DirectoryService<S>
+where
+    S: crate::directory::DirectoryStorage,
+{
     /// map volume id to locations
-    pub volume_locations: Arc<RwLock<HashMap<u64, String>>>,
-    pub dir: weaver::directory::Directory,
-    /// the next file_id of each volume
-    pub volume_next_fileid: Arc<AtomicU64>,
+    pub storage: crate::directory::Directory<S>,
 }
 
-impl DirectoryService {
-    pub fn new<P: AsRef<Path>>(path: P, volume_size: u64) -> DirectoryService {
+impl<S> DirectoryService<S>
+where
+    S: crate::directory::DirectoryStorage,
+{
+    pub fn new(storage: S) -> DirectoryService<S>
+    where
+        S: crate::directory::DirectoryStorage,
+    {
         DirectoryService {
-            volume_locations: Arc::new(RwLock::new(HashMap::new())),
-            volume_next_fileid: Arc::new(AtomicU64::new(0)),
-            dir: weaver::directory::Directory::new(path.as_ref(), volume_size).unwrap(),
+            storage: crate::directory::Directory::new(storage),
         }
     }
 }
 
 #[tonic::async_trait]
-impl weaver_proto::directory::server::Directory for DirectoryService {
+impl<S> weaver_proto::directory::server::Directory for DirectoryService<S>
+where
+    S: crate::directory::DirectoryStorage + 'static,
+{
     async fn lookup_entry(
         &self,
         _request: tonic::Request<weaver_proto::directory::LookupEntryRequest>,

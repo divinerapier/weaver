@@ -208,16 +208,14 @@ impl Volume {
         let index_path: PathBuf = dir.join(format!("{}.index", id));
         if volume_path.exists() {
             log::error!(
-                "couldn't create the volume data which exists already. id: {}, path: {}",
-                id,
+                "couldn't create the volume data on an exists path. path: {}",
                 volume_path.display()
             );
             return Err(storage_error!("exists volume data: {}", id));
         }
         if index_path.exists() {
             log::error!(
-                "couldn't create the volume index which exists already. id: {}, path: {}",
-                id,
+                "couldn't create the volume index on an exists path. path: {}",
                 index_path.display()
             );
             return Err(storage_error!("exists volume index: {}", id));
