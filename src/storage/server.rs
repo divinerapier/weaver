@@ -135,7 +135,7 @@ impl weaver_proto::storage::server::Storage for StorageService {
         tokio::sync::mpsc::Receiver<Result<weaver_proto::storage::ReadNeedleResponse, Status>>;
     async fn read_needle(
         &self,
-        request: tonic::Request<weaver_proto::storage::ReadNeedleRequest>,
+        _request: tonic::Request<weaver_proto::storage::ReadNeedleRequest>,
     ) -> Result<tonic::Response<Self::ReadNeedleStream>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }

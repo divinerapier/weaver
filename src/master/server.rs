@@ -55,62 +55,62 @@ impl weaver_proto::master::server::Master for MasterService {
 
     async fn keep_connected(
         &self,
-        request: tonic::Request<tonic::Streaming<weaver_proto::master::KeepConnectedRequest>>,
+        _request: tonic::Request<tonic::Streaming<weaver_proto::master::KeepConnectedRequest>>,
     ) -> Result<tonic::Response<Self::KeepConnectedStream>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
 
     async fn lookup_volume(
         &self,
-        request: tonic::Request<weaver_proto::master::LookupVolumeRequest>,
+        _request: tonic::Request<weaver_proto::master::LookupVolumeRequest>,
     ) -> Result<tonic::Response<weaver_proto::master::LookupVolumeResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
 
     async fn assign(
         &self,
-        request: tonic::Request<weaver_proto::master::AssignRequest>,
+        _request: tonic::Request<weaver_proto::master::AssignRequest>,
     ) -> Result<tonic::Response<weaver_proto::master::AssignResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
 
     async fn statistics(
         &self,
-        request: tonic::Request<weaver_proto::master::StatisticsRequest>,
+        _request: tonic::Request<weaver_proto::master::StatisticsRequest>,
     ) -> Result<tonic::Response<weaver_proto::master::StatisticsResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
 
     async fn volume_list(
         &self,
-        request: tonic::Request<weaver_proto::master::VolumeListRequest>,
+        _request: tonic::Request<weaver_proto::master::VolumeListRequest>,
     ) -> Result<tonic::Response<weaver_proto::master::VolumeListResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
 
     async fn lookup_ec_volume(
         &self,
-        request: tonic::Request<weaver_proto::master::LookupEcVolumeRequest>,
+        _request: tonic::Request<weaver_proto::master::LookupEcVolumeRequest>,
     ) -> Result<tonic::Response<weaver_proto::master::LookupEcVolumeResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
 
     async fn get_master_configuration(
         &self,
-        request: tonic::Request<weaver_proto::master::GetMasterConfigurationRequest>,
+        _request: tonic::Request<weaver_proto::master::GetMasterConfigurationRequest>,
     ) -> Result<tonic::Response<weaver_proto::master::GetMasterConfigurationResponse>, tonic::Status>
     {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn bucket_list(
         &self,
-        request: tonic::Request<weaver_proto::master::BucketListRequest>,
+        _request: tonic::Request<weaver_proto::master::BucketListRequest>,
     ) -> Result<tonic::Response<weaver_proto::master::BucketListResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn bucket_delete(
         &self,
-        request: tonic::Request<weaver_proto::master::BucketDeleteRequest>,
+        _request: tonic::Request<weaver_proto::master::BucketDeleteRequest>,
     ) -> Result<tonic::Response<weaver_proto::master::BucketDeleteResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }

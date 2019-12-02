@@ -28,56 +28,56 @@ impl DirectoryService {
 impl weaver_proto::directory::server::Directory for DirectoryService {
     async fn lookup_entry(
         &self,
-        request: tonic::Request<weaver_proto::directory::LookupEntryRequest>,
+        _request: tonic::Request<weaver_proto::directory::LookupEntryRequest>,
     ) -> Result<tonic::Response<weaver_proto::directory::LookupEntryResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn list_entries(
         &self,
-        request: tonic::Request<weaver_proto::directory::ListEntriesRequest>,
+        _request: tonic::Request<weaver_proto::directory::ListEntriesRequest>,
     ) -> Result<tonic::Response<weaver_proto::directory::ListEntriesResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn create_entry(
         &self,
-        request: tonic::Request<weaver_proto::directory::CreateEntryRequest>,
+        _request: tonic::Request<weaver_proto::directory::CreateEntryRequest>,
     ) -> Result<tonic::Response<weaver_proto::directory::CreateEntryResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn update_entry(
         &self,
-        request: tonic::Request<weaver_proto::directory::UpdateEntryRequest>,
+        _request: tonic::Request<weaver_proto::directory::UpdateEntryRequest>,
     ) -> Result<tonic::Response<weaver_proto::directory::UpdateEntryResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn delete_entry(
         &self,
-        request: tonic::Request<weaver_proto::directory::DeleteEntryRequest>,
+        _request: tonic::Request<weaver_proto::directory::DeleteEntryRequest>,
     ) -> Result<tonic::Response<weaver_proto::directory::DeleteEntryResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn assign_volume(
         &self,
-        request: tonic::Request<weaver_proto::directory::AssignVolumeRequest>,
+        _request: tonic::Request<weaver_proto::directory::AssignVolumeRequest>,
     ) -> Result<tonic::Response<weaver_proto::directory::AssignVolumeResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn lookup_volume(
         &self,
-        request: tonic::Request<weaver_proto::directory::LookupVolumeRequest>,
+        _request: tonic::Request<weaver_proto::directory::LookupVolumeRequest>,
     ) -> Result<tonic::Response<weaver_proto::directory::LookupVolumeResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn delete_collection(
         &self,
-        request: tonic::Request<weaver_proto::directory::DeleteCollectionRequest>,
+        _request: tonic::Request<weaver_proto::directory::DeleteCollectionRequest>,
     ) -> Result<tonic::Response<weaver_proto::directory::DeleteCollectionResponse>, tonic::Status>
     {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn statistics(
         &self,
-        request: tonic::Request<weaver_proto::directory::StatisticsRequest>,
+        _request: tonic::Request<weaver_proto::directory::StatisticsRequest>,
     ) -> Result<tonic::Response<weaver_proto::directory::StatisticsResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
