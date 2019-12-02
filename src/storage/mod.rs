@@ -6,16 +6,18 @@ use crate::error::Result;
 use crate::needle::Needle;
 pub use volume::Volume;
 
+pub mod index;
 pub mod server;
 pub mod volume;
 
 /// Storage consists of many volumes.
-struct StorageImpl {
+struct InnerStorage {
+    /// the directory
     pub directory: PathBuf,
 
     /// all volumes on storage
     /// volume id -> volume
-    pub volumes: HashMap<u64, Volume>,
+    pub volumes: HashMap<u64, Volume<index::JSONCodec>>,
 
     /// public address
     pub ip: String,
@@ -28,85 +30,10 @@ struct StorageImpl {
     pub readonly_volumes: HashSet<u64>,
 }
 
-pub struct Storage {
-    inner: RwLock<StorageImpl>,
-}
-
-impl Storage {
-    pub fn new(dir: &str, ip: &str, port: u16) -> Result<Storage> {
-        let dir_result = std::fs::read_dir(dir)?;
-        let mut latest_volume_id = 0;
-
-        let index_files = dir_result
-            .filter_map(|entry| {
-                let entry: std::fs::DirEntry = entry.ok()?;
-                let metadata = entry.metadata().ok()?;
-                if !metadata.is_file() || metadata.permissions().readonly() {
-                    log::warn!(
-                        "file in volume dir is readonly. {}/{}",
-                        dir,
-                        entry.file_name().to_str().unwrap()
-                    );
-                    None
-                } else {
-                    Some((entry, metadata))
-                }
-            })
-            .filter_map(|(entry, _)| {
-                if let Some(extension) = PathBuf::from(entry.file_name()).extension() {
-                    if extension == "index" {
-                        // file_name, eg: 1.index
-                        // index_files.push(entry.file_name());
-                        Some(entry.file_name())
-                    } else {
-                        log::warn!("open store. skip entry: {:?}", entry);
-                        None
-                    }
-                } else {
-                    log::error!("open store. skip entry: {:?}", entry);
-                    None
-                }
-            })
-            .collect::<Vec<std::ffi::OsString>>();
-
-        let volumes = index_files
-            .iter()
-            .filter_map(|index_file_name| {
-                let index_file_name = index_file_name.to_str()?;
-                let char_at = index_file_name.find('.')?;
-                let index_file_name: &str = index_file_name;
-                let index: std::result::Result<usize, std::num::ParseIntError> =
-                    index_file_name[0..char_at].parse::<usize>();
-                let index = index.ok()?;
-                Some((index as u64, index_file_name))
-            })
-            .map(|(index, index_file_name)| {
-                let volume_result = Volume::open(&Path::new(dir).join(index_file_name), 128);
-                if index > latest_volume_id {
-                    latest_volume_id = index;
-                }
-                (index, volume_result)
-            })
-            .filter(|(_, volume_result)| volume_result.is_ok())
-            .map(|(index, volume_result)| (index, volume_result.unwrap()))
-            .collect::<HashMap<u64, Volume>>();
-
-        Ok(Storage {
-            inner: RwLock::new(StorageImpl {
-                directory: PathBuf::from(dir),
-                volumes,
-                ip: ip.to_owned(),
-                port,
-                latest_volume_id,
-                writable_volumes: HashSet::new(),
-                readonly_volumes: HashSet::new(),
-            }),
-        })
-    }
-
+impl InnerStorage {
     // Create a storage instance on the specified directory and network address.
-    // Check and open volumes if there are data.
-    pub fn new2(dir: &str, ip: &str, port: u16) -> Result<Storage> {
+    // Open if there are some volumes located at.
+    pub fn open(dir: &str, ip: &str, port: u16) -> Result<InnerStorage> {
         let dir_result = std::fs::read_dir(dir)?;
         let mut latest_volume_id = 0;
 
@@ -153,21 +80,21 @@ impl Storage {
                 let index = index.ok()?;
                 Some((index as u64, index_file_name))
             })
-            .map(|(index, _index_file_name)| {
-                let volume_result = Volume::open2(dir, index, 128);
-                if index > latest_volume_id {
-                    latest_volume_id = index;
+            .map(|(idx, _index_file_name)| {
+                let volume_result = Volume::open2(dir, idx, 128, index::JSONCodec);
+                if idx > latest_volume_id {
+                    latest_volume_id = idx;
                 }
-                (index, volume_result)
+                (idx, volume_result)
             })
             .filter(|(_, volume_result)| volume_result.is_ok())
             .map(|(index, volume_result)| (index, volume_result.unwrap()))
-            .collect::<HashMap<u64, Volume>>();
+            .collect::<HashMap<u64, Volume<index::JSONCodec>>>();
 
         let writable_volumes = volumes
             .iter()
             .filter(|(_, volume)| {
-                let volume: &Volume = volume;
+                let volume = volume;
                 volume.writable()
             })
             .map(|(volume_id, _)| *volume_id)
@@ -175,22 +102,34 @@ impl Storage {
         let readonly_volumes = volumes
             .iter()
             .filter(|(_, volume)| {
-                let volume: &Volume = volume;
+                let volume = volume;
                 !volume.writable()
             })
             .map(|(volume_id, _)| *volume_id)
             .collect::<HashSet<u64>>();
 
-        Ok(Storage {
-            inner: RwLock::new(StorageImpl {
-                directory: PathBuf::from(dir),
-                volumes,
-                ip: ip.to_owned(),
-                port,
-                latest_volume_id,
-                writable_volumes,
-                readonly_volumes,
-            }),
+        Ok(InnerStorage {
+            directory: PathBuf::from(dir),
+            volumes,
+            ip: ip.to_owned(),
+            port,
+            latest_volume_id,
+            writable_volumes,
+            readonly_volumes,
+        })
+    }
+}
+
+pub struct Storage {
+    inner: RwLock<InnerStorage>,
+}
+
+impl Storage {
+    // Create a storage instance on the specified directory and network address.
+    // Open if there are some volumes located at.
+    pub fn open(dir: &str, ip: &str, port: u16) -> Result<Storage> {
+        InnerStorage::open(dir, ip, port).map(|s| Storage {
+            inner: RwLock::new(s),
         })
     }
 
@@ -207,7 +146,13 @@ impl Storage {
         }
         let super_block =
             volume::SuperBlock::new(&replica_replacement, max_volume_size, max_needle_count);
-        let volume = Volume::new2(&storage.directory, volume_id as u32, 128, &super_block)?;
+        let volume = Volume::new2(
+            &storage.directory,
+            volume_id as u32,
+            128,
+            &super_block,
+            index::JSONCodec,
+        )?;
 
         if volume.writable() {
             storage.writable_volumes.insert(volume_id);
@@ -237,7 +182,7 @@ impl Storage {
             // FIXME: index out of range
             return Err(error!("volume not found"));
         }
-        let volume: &Volume = &storage.volumes[&(volume_id as u64)];
+        let volume = &storage.volumes[&(volume_id as u64)];
         volume.get(needle_id)
     }
 }

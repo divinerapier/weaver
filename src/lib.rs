@@ -3,7 +3,6 @@ pub mod macros;
 
 pub mod directory;
 pub mod error;
-pub mod index;
 pub mod master;
 pub mod needle;
 pub mod node;

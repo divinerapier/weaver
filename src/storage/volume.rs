@@ -1,7 +1,8 @@
 use crate::error::{self, Error, Result};
-use crate::index::{Index, RawIndex};
 use crate::needle::{Needle, NeedleBody, NeedleHeader};
 use crate::utils;
+
+use super::index::Entry as IndexEntry;
 
 use bytes::ByteOrder;
 
@@ -84,18 +85,19 @@ impl Default for ReplicaReplacement {
     }
 }
 
-pub struct Volume {
+pub struct Volume<C: super::index::Codec> {
     pub super_block: Arc<RwLock<SuperBlock>>,
     pub attibute: VolumeAttibute,
     pub writable_volume: Arc<Mutex<File>>,
     pub readonly_volume: Arc<File>,
     pub current_length: AtomicU64,
-    pub index_file: Arc<Mutex<File>>,
-    pub indexes: Arc<RwLock<HashMap<u64, RawIndex>>>,
+    pub index: super::index::Index<C>,
+    // pub index_file: Arc<Mutex<File>>,
+    // pub indexes: Arc<RwLock<HashMap<u64, IndexEntry>>>,
 }
 
-unsafe impl Send for Volume {}
-unsafe impl Sync for Volume {}
+unsafe impl<C: super::index::Codec> Send for Volume<C> {}
+unsafe impl<C: super::index::Codec> Sync for Volume<C> {}
 
 pub struct VolumeAttibute {
     pub id: AtomicU64,
@@ -103,7 +105,7 @@ pub struct VolumeAttibute {
     pub max_length: AtomicU64,
 }
 
-impl Volume {
+impl<C: super::index::Codec> Volume<C> {
     pub fn id(&self) -> u64 {
         self.attibute.id.load(Ordering::Relaxed)
     }
@@ -196,14 +198,17 @@ impl From<&[u8]> for SuperBlock {
     }
 }
 
-impl Display for Volume {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self)
-    }
-}
+// impl <C> Display for Volume<C> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         write!(f, "{}", self)
+//     }
+// }
 
-impl Volume {
-    pub fn new(dir: &Path, id: u32, size: u64) -> Result<Volume> {
+impl<C> Volume<C>
+where
+    C: super::index::Codec,
+{
+    pub fn new(dir: &Path, id: u32, size: u64, codec: C) -> Result<Volume<C>> {
         let volume_path: PathBuf = dir.join(format!("{}.data", id));
         let index_path: PathBuf = dir.join(format!("{}.index", id));
         if volume_path.exists() {
@@ -220,7 +225,7 @@ impl Volume {
             );
             return Err(storage_error!("exists volume index: {}", id));
         }
-        let (index_file, index_map, _) = Self::open_indexes(index_path, true)?;
+        // let (index_file, index_map, _) = Self::open_indexes(index_path, true)?;
         let (readonly_file, writable_file) = Self::open_volumes(&volume_path, true)?;
         let current_length = writable_file.metadata()?.len();
         Ok(Volume {
@@ -238,14 +243,13 @@ impl Volume {
             writable_volume: Arc::new(Mutex::new(writable_file)),
             readonly_volume: Arc::new(readonly_file),
             current_length: AtomicU64::new(current_length),
-            index_file: Arc::new(Mutex::new(index_file)),
-            indexes: Arc::new(RwLock::new(index_map)),
+            index: super::index::Index::new(&index_path, codec)?,
         })
     }
 
     /// open a physical volume file from disk
     /// volume_path is the
-    pub fn open(volume_path: &Path, size: u64) -> Result<Volume> {
+    pub fn open(volume_path: &Path, size: u64, codec: C) -> Result<Volume<C>> {
         let extension = volume_path
             .extension()
             .ok_or(storage_error!("get file_stem from {:?}", volume_path))?;
@@ -264,7 +268,7 @@ impl Volume {
         let index_file_str = naive_volume_path_str.to_owned() + "index";
         let volume_file_str = naive_volume_path_str.to_owned() + "data";
 
-        let (index_file, index_map, last_index) = Self::open_indexes(index_file_str, false)?;
+        let (_, _, last_index) = Self::open_indexes(&index_file_str, false)?;
         let (readonly_file, writable_file) = Self::open_volumes(volume_file_str, false)?;
         let current_length = writable_file.metadata()?.len();
         if current_length != (last_index.offset + last_index.length) as u64 {
@@ -299,8 +303,9 @@ impl Volume {
             writable_volume: Arc::new(Mutex::new(writable_file)),
             readonly_volume: Arc::new(readonly_file),
             current_length: AtomicU64::new(current_length),
-            index_file: Arc::new(Mutex::new(index_file)),
-            indexes: Arc::new(RwLock::new(index_map)),
+            index: super::index::Index::new(index_file_str, codec)?,
+            // index_file: Arc::new(Mutex::new(index_file)),
+            // indexes: Arc::new(RwLock::new(index_map)),
         })
     }
 
@@ -324,12 +329,16 @@ impl Volume {
         id: u32,
         size: u64,
         super_block: &SuperBlock,
-    ) -> Result<Volume> {
+        codec: C,
+    ) -> Result<Volume<C>>
+    where
+        C: super::index::Codec,
+    {
         let volume_path: PathBuf = dir.as_ref().join(format!("{}.data", id));
         let index_path: PathBuf = dir.as_ref().join(format!("{}.index", id));
         Self::path_exists(id, &volume_path)?;
         Self::path_exists(id, &index_path)?;
-        let (index_file, index_map, _) = Self::open_indexes(index_path, true)?;
+        // let (_, _, _) = Self::open_indexes(&index_path, true)?;
         let (readonly_file, mut writable_file) = Self::open_volumes(&volume_path, true)?;
 
         super_block.write_to(&mut writable_file)?;
@@ -350,18 +359,17 @@ impl Volume {
             writable_volume: Arc::new(Mutex::new(writable_file)),
             readonly_volume: Arc::new(readonly_file),
             current_length: AtomicU64::new(current_length),
-            index_file: Arc::new(Mutex::new(index_file)),
-            indexes: Arc::new(RwLock::new(index_map)),
+            index: super::index::Index::new(&index_path, codec)?,
         })
     }
 
     // Open the exist file.
-    pub fn open2(dir: &str, id: u64, size: u64) -> Result<Volume> {
+    pub fn open2(dir: &str, id: u64, size: u64, codec: C) -> Result<Volume<C>> {
         // filename should be a usize number
         let data_file_path = format!("{}/{}.data", dir, id);
         let index_file_path = format!("{}/{}.index", dir, id);
 
-        let (index_file, index_map, last_index) = Self::open_indexes(index_file_path, false)?;
+        let (_, _, last_index) = Self::open_indexes(&index_file_path, false)?;
         let (readonly_file, mut writable_file) = Self::open_volumes(&data_file_path, false)?;
         let current_length = writable_file.metadata()?.len();
         if current_length != (last_index.offset + last_index.length) as u64 {
@@ -396,8 +404,9 @@ impl Volume {
             writable_volume: Arc::new(Mutex::new(writable_file)),
             readonly_volume: Arc::new(readonly_file),
             current_length: AtomicU64::new(current_length),
-            index_file: Arc::new(Mutex::new(index_file)),
-            indexes: Arc::new(RwLock::new(index_map)),
+            index: super::index::Index::new(&index_file_path, codec)?,
+            // index_file: Arc::new(Mutex::new(index_file)),
+            // indexes: Arc::new(RwLock::new(index_map)),
         })
     }
 
@@ -453,7 +462,7 @@ impl Volume {
     fn open_indexes<P: AsRef<Path>>(
         filepath: P,
         new: bool,
-    ) -> Result<(File, HashMap<u64, RawIndex>, RawIndex)> {
+    ) -> Result<(File, HashMap<u64, IndexEntry>, IndexEntry)> {
         let index_file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -466,19 +475,18 @@ impl Volume {
         let mut index_map = HashMap::new();
 
         if new {
-            return Ok((index_file, index_map, RawIndex::default()));
+            return Ok((index_file, index_map, IndexEntry::default()));
         }
         let volume_id: u32 = Self::parse_volume_file_stem_name(filepath.as_ref())?;
         let mut readonly_index_file = index_file.try_clone()?;
         readonly_index_file.seek(SeekFrom::Start(0))?;
         let reader = std::io::BufReader::new(readonly_index_file);
-        let indexes_reader = Deserializer::from_reader(reader).into_iter::<Index>();
-        let mut last_index = RawIndex::default();
+        let indexes_reader = Deserializer::from_reader(reader).into_iter::<IndexEntry>();
+        let mut last_index = IndexEntry::default();
         for index_result in indexes_reader {
-            let index: Index = index_result?;
-            let raw_index = RawIndex::new(volume_id, index.offset, index.length);
-            last_index = raw_index;
-            index_map.insert(index.needle_id, raw_index);
+            let index: IndexEntry = index_result?;
+            last_index = index;
+            index_map.insert(index.needle_id, index);
         }
 
         Ok((index_file, index_map, last_index))
@@ -546,24 +554,20 @@ impl Volume {
             ));
         }
 
-        let index = Index::new(
-            needle_id,
-            self.id() as u32,
-            self.current_length() as usize,
-            total_length,
-        );
+        let index = IndexEntry::new(needle_id, self.current_length() as usize, total_length);
 
         {
-            let mut index_file = self.index_file.lock().unwrap();
-            index_file.write_all(serde_json::to_string(&index)?.as_bytes())?;
+            self.index.write(&index)?;
+            // let mut index_file = self.index_file.lock().unwrap();
+            // index_file.write_all(serde_json::to_string(&index)?.as_bytes())?;
             self.current_length
                 .fetch_add(total_length as u64, Ordering::SeqCst);
         }
-        let mut indexes = self.indexes.write().unwrap();
-        indexes.insert(
-            needle_id,
-            RawIndex::new(index.volume_id, index.offset, index.length),
-        );
+        // let mut indexes = self.indexes.write().unwrap();
+        // indexes.insert(
+        //     needle_id,
+        //     IndexEntry::new(needle_id, index.offset, index.length),
+        // );
         Ok(())
     }
 
@@ -603,39 +607,41 @@ impl Volume {
 
     fn _write_index(&mut self, needle: &weaver_proto::weaver::Needle) -> Result<()> {
         let needle = needle.header.as_ref().unwrap();
-        let index = Index::new(
+        let index = IndexEntry::new(
             needle.id,
-            self.id() as u32,
             self.current_length() as usize,
             needle.total_size as usize,
         );
 
         {
-            let mut index_file = self.index_file.lock().unwrap();
-            index_file.write_all(serde_json::to_string(&index)?.as_bytes())?;
+            self.index.write(&index)?;
+            // let mut index_file = self.index_file.lock().unwrap();
+            // index_file.write_all(serde_json::to_string(&index)?.as_bytes())?;
         }
         self.current_length
             .fetch_add(needle.total_size, Ordering::SeqCst);
-        {
-            let mut indexes = self.indexes.write().unwrap();
-            indexes.insert(
-                needle.id,
-                RawIndex::new(index.volume_id, index.offset, index.length),
-            );
-        }
+        // {
+        //     let mut indexes = self.indexes.write().unwrap();
+        //     indexes.insert(
+        //         needle.id,
+        //         IndexEntry::new(needle.id, index.offset, index.length),
+        //     );
+        // }
         Ok(())
     }
 
     pub fn get(&self, needle_id: u64) -> Result<Needle> {
-        let indexes = self.indexes.read().unwrap();
-        let index: RawIndex = indexes
-            .get(&needle_id)
-            .ok_or(storage_error!(
-                "needle not in indexes: {}, indexes: {:?}",
-                needle_id,
-                self.indexes
-            ))?
-            .clone();
+        let index: IndexEntry = self.index.read(needle_id)?;
+
+        // let indexes = self.indexes.read().unwrap();
+        // let index: IndexEntry = indexes
+        //     .get(&needle_id)
+        //     .ok_or(storage_error!(
+        //         "needle not in indexes: {}, indexes: {:?}",
+        //         needle_id,
+        //         self.indexes
+        //     ))?
+        //     .clone();
         log::debug!("index: {:?}", index);
         if ((index.offset + index.length) as u64) > self.current_length() {
             log::error!(
@@ -665,7 +671,7 @@ impl Volume {
 
     pub fn read_needle_body() {}
 
-    pub fn read_needle(&self, index: &RawIndex) -> Result<Needle> {
+    pub fn read_needle(&self, index: &IndexEntry) -> Result<Needle> {
         let readonly_volume = self.readonly_volume.clone();
         let mut readonly_volume = readonly_volume.try_clone()?;
         let needle_header = Self::read_needle_header(&mut readonly_volume, index.offset)?;
@@ -735,7 +741,7 @@ impl Volume {
 mod test {
     #[test]
     fn read_json_from_file() {
-        use super::Index;
+        use super::IndexEntry;
         use serde_json::Deserializer;
         use std::fs::File;
         use std::io::Seek;
@@ -743,10 +749,10 @@ mod test {
 
         let mut file: File = tempfile::tempfile().unwrap();
 
-        let indexes: Vec<Index> = vec![
-            Index::new(0, 1, 0, 10),
-            Index::new(1, 1, 10, 20),
-            Index::new(2, 1, 20, 30),
+        let indexes: Vec<IndexEntry> = vec![
+            IndexEntry::new(0, 0, 10),
+            IndexEntry::new(1, 10, 20),
+            IndexEntry::new(2, 20, 30),
         ];
 
         for index in &indexes {
@@ -757,9 +763,9 @@ mod test {
         file.seek(std::io::SeekFrom::Start(0)).unwrap();
         let reader = std::io::BufReader::new(file.try_clone().unwrap());
         let mut result = vec![];
-        let indexes_reader = Deserializer::from_reader(reader).into_iter::<Index>();
+        let indexes_reader = Deserializer::from_reader(reader).into_iter::<IndexEntry>();
         for index_result in indexes_reader {
-            let index: Index = index_result.unwrap();
+            let index: IndexEntry = index_result.unwrap();
             result.push(index);
         }
         assert_eq!(indexes.len(), result.len());

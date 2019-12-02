@@ -24,7 +24,7 @@ where
 pub trait DirectoryStorage: Send + Sync {
     async fn create(&mut self, key: &str, chunks: Vec<Chunk>) -> Result<()>;
     async fn update(&mut self, key: &str, chunks: Vec<Chunk>) -> Result<()>;
-    async fn retrieve<'a>(&'a self, key: &str) -> Result<&'a Vec<Chunk>>;
+    async fn retrieve(&self, key: &str) -> Result<Vec<Chunk>>;
     async fn delete(&mut self, key: &str) -> Result<()>;
 }
 
@@ -79,9 +79,9 @@ impl DirectoryStorage for MemoryDirectoryStorage {
         }
     }
 
-    async fn retrieve<'a>(&'a self, key: &str) -> Result<&'a Vec<Chunk>> {
+    async fn retrieve(&self, key: &str) -> Result<Vec<Chunk>> {
         match self.entries.get(key) {
-            Some(entry) => Ok(entry),
+            Some(entry) => Ok(entry.to_vec()),
             None => Err(directory_error!("entry not found. {}", key)),
         }
     }

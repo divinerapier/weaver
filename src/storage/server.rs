@@ -17,7 +17,7 @@ pub struct StorageService {
 impl StorageService {
     pub fn new(dir: &str, ip: &str, port: u16) -> StorageService {
         StorageService {
-            storage: Storage::new(dir, ip, port).unwrap(),
+            storage: Storage::open(dir, ip, port).unwrap(),
         }
     }
 }
