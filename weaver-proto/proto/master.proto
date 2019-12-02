@@ -6,17 +6,8 @@ import "weaver.proto";
 
 service Master {
   rpc Heartbeat(stream HeartbeatRequest) returns (stream HeartbeatResponse) {}
-  rpc KeepConnected(stream KeepConnectedRequest)
-      returns (stream VolumeLocation) {}
   rpc LookupVolume(LookupVolumeRequest) returns (LookupVolumeResponse) {}
   rpc Assign(AssignRequest) returns (AssignResponse) {}
-  rpc Statistics(StatisticsRequest) returns (StatisticsResponse) {}
-  rpc BucketList(BucketListRequest) returns (BucketListResponse) {}
-  rpc BucketDelete(BucketDeleteRequest) returns (BucketDeleteResponse) {}
-  rpc VolumeList(VolumeListRequest) returns (VolumeListResponse) {}
-  rpc LookupEcVolume(LookupEcVolumeRequest) returns (LookupEcVolumeResponse) {}
-  rpc GetMasterConfiguration(GetMasterConfigurationRequest)
-      returns (GetMasterConfigurationResponse) {}
 }
 
 message HeartbeatRequest {
@@ -29,7 +20,6 @@ message HeartbeatRequest {
   string rack = 7;
   uint32 admin_port = 8;
   repeated VolumeInformationMessage volumes = 9;
-  // delta volumes
   repeated VolumeShortInformationMessage new_volumes = 10;
   repeated VolumeShortInformationMessage deleted_volumes = 11;
   bool has_no_volumes = 12;
@@ -42,38 +32,24 @@ message HeartbeatResponse {
   uint32 metrics_interval_seconds = 4;
 }
 
-message KeepConnectedRequest { string name = 1; }
-
-message VolumeLocation {
-  string url = 1;
-  string presigned_url = 2;
-  repeated uint32 new_vids = 3;
-  repeated uint32 deleted_vids = 4;
-  string leader = 5; // optional when leader is not itself
-}
-
 message LookupVolumeRequest {
-  repeated string volume_ids = 1;
-  string bucket = 2; // optional, a bit faster if provided.
+  repeated int64 volume_ids = 1;
 }
 message LookupVolumeResponse {
-  message VolumeIdLocation {
-    string volume_id = 1;
+  message VolumeLocation {
+    int64 volume_id = 1;
     repeated Location locations = 2;
     string error = 3;
   }
-  repeated VolumeIdLocation volume_id_locations = 1;
+  repeated VolumeLocation volume_id_locations = 1;
 }
 
 message AssignRequest {
   uint64 count = 1;
   ReplicaReplacement replica_replacement = 2;
-  string bucket = 3;
-  string ttl = 4;
   string data_center = 5;
   string rack = 6;
   string data_node = 7;
-  uint32 memory_map_max_size_mb = 8;
 }
 message AssignResponse {
   string fid = 1;
@@ -82,46 +58,4 @@ message AssignResponse {
   uint64 count = 4;
   string error = 5;
   string auth = 6;
-}
-
-message StatisticsRequest {
-  ReplicaReplacement replica_replacement = 1;
-  string bucket = 2;
-  string ttl = 3;
-}
-message StatisticsResponse {
-  ReplicaReplacement replica_replacement = 1;
-  string bucket = 2;
-  string ttl = 3;
-  uint64 total_size = 4;
-  uint64 used_size = 5;
-  uint64 file_count = 6;
-}
-
-message BucketListRequest {
-  bool include_normal_volumes = 1;
-  bool include_ec_volumes = 2;
-}
-message BucketListResponse { repeated Bucket buckets = 1; }
-
-message BucketDeleteRequest { string name = 1; }
-message BucketDeleteResponse {}
-
-message VolumeListRequest {}
-message VolumeListResponse { uint64 volume_size_limit_mb = 2; }
-
-message LookupEcVolumeRequest { uint32 volume_id = 1; }
-message LookupEcVolumeResponse {
-  uint32 volume_id = 1;
-  message EcShardIdLocation {
-    uint32 shard_id = 1;
-    repeated Location locations = 2;
-  }
-  repeated EcShardIdLocation shard_id_locations = 2;
-}
-
-message GetMasterConfigurationRequest {}
-message GetMasterConfigurationResponse {
-  string metrics_address = 1;
-  uint32 metrics_interval_seconds = 2;
 }

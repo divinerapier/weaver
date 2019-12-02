@@ -1,22 +1,40 @@
-build-all:
-	cargo build --package weaver-proto
+build: build-storage build-master build-directory
+
+build-library: build-proto
 	cargo build
-	cargo build --package weaver-directory
+
+build-storage: build-library
 	cargo build --package weaver-storage
+	
+build-master: build-library
 	cargo build --package weaver-master
 
-release:
-	cargo build --release --package weaver-proto
+build-directory: build-library
+	cargo build --package weaver-directory
+
+release: build-storage build-master build-directory
+
+
+release-library: release-proto
 	cargo build --release
-	cargo build --release --package weaver-directory
+
+release-storage: release-library
 	cargo build --release --package weaver-storage
+	
+release-master: release-library
 	cargo build --release --package weaver-master
 
-test: cargo-fmt generate-proto
+release-directory: release-library
+	cargo build --release --package weaver-directory
+
+test: library
 	RUST_BACKTRACE=full cargo test -- --nocapture
 	
-generate-proto: cargo-fmt
+build-proto: format
 	cargo build --package weaver-proto
 
-cargo-fmt:
+release-proto: format
+	cargo build --release --package weaver-proto
+
+format:
 	cargo fmt

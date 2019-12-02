@@ -1,8 +1,5 @@
-use crate::{Error, Result};
-use futures::stream::StreamExt;
-use std::collections::{HashMap, HashSet};
-use std::path::Path;
-use std::sync::{Arc, RwLock};
+use crate::Result;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct Chunk {
