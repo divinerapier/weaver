@@ -7,7 +7,7 @@ use crate::needle::Needle;
 pub use volume::Volume;
 
 pub mod index;
-pub mod server;
+pub mod service;
 pub mod volume;
 
 /// Storage consists of many volumes.

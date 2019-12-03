@@ -2,7 +2,7 @@ use crate::Result;
 use std::collections::HashMap;
 use std::marker::{Send, Sync};
 
-pub mod server;
+pub mod service;
 
 #[derive(Clone)]
 pub struct Chunk {
