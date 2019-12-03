@@ -19,9 +19,9 @@ message HeartbeatRequest {
   string data_center = 6;
   string rack = 7;
   uint32 admin_port = 8;
-  repeated VolumeInformationMessage volumes = 9;
-  repeated VolumeShortInformationMessage new_volumes = 10;
-  repeated VolumeShortInformationMessage deleted_volumes = 11;
+  repeated weaver.VolumeInformationMessage volumes = 9;
+  repeated weaver.VolumeShortInformationMessage new_volumes = 10;
+  repeated weaver.VolumeShortInformationMessage deleted_volumes = 11;
   bool has_no_volumes = 12;
 }
 
@@ -33,24 +33,26 @@ message HeartbeatResponse {
 }
 
 message LookupVolumeRequest {
-  repeated int64 volume_ids = 1;
+  repeated int64 volumes = 1;
 }
+
 message LookupVolumeResponse {
   message VolumeLocation {
     int64 volume_id = 1;
     repeated Location locations = 2;
     string error = 3;
   }
-  repeated VolumeLocation volume_id_locations = 1;
+  repeated VolumeLocation volume_locations = 1;
 }
 
 message AssignRequest {
   uint64 count = 1;
-  ReplicaReplacement replica_replacement = 2;
+  weaver.ReplicaReplacement replica_replacement = 2;
   string data_center = 5;
   string rack = 6;
   string data_node = 7;
 }
+
 message AssignResponse {
   string fid = 1;
   string url = 2;

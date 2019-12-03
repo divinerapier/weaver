@@ -23,7 +23,7 @@ failure = "0.1.5"
 srand = "0.4.0"
 rand = "0.7.2"
 reservoir = "*"
-
+rose_tree = {git = "https://github.com/divinerapier/rose_tree-rs", branch = "master"}
 
 # local
 weaver-proto = {path = "weaver-proto", version = "0.1.0"}
