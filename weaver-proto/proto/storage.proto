@@ -12,11 +12,10 @@ service Storage {
 
 message AllocateVolumeRequest {
   uint32 volume_id = 1;
-  string bucket = 2;
-  int64 preallocate = 3;
-  ReplicaReplacement replica_replacement = 4;
-  string ttl = 5;
-  uint32 memory_map_max_size_mb = 6;
+  uint32 max_volume_size = 2;
+  uint32 max_needle_count = 3;
+  int64 ttl = 4;
+  ReplicaReplacement replica_replacement = 5;
 }
 
 message AllocateVolumeResponse { weaver.Status status = 1; }

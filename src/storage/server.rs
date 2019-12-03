@@ -1,7 +1,3 @@
-use std::sync::{Arc, RwLock, RwLockReadGuard};
-
-use crate::error::Error;
-use crate::needle::Needle;
 use crate::storage::Storage;
 
 use futures::{Stream, StreamExt};
@@ -24,7 +20,7 @@ impl StorageService {
 
 #[tonic::async_trait]
 impl weaver_proto::storage::server::Storage for StorageService {
-    /// Create a new volume.
+    /// Create a new volume with the specified replica replacement.
     async fn allocate_volume(
         &self,
         request: tonic::Request<weaver_proto::storage::AllocateVolumeRequest>,
@@ -35,8 +31,12 @@ impl weaver_proto::storage::server::Storage for StorageService {
             .replica_replacement
             .map(|rr| super::volume::ReplicaReplacement::from(rr));
 
-        self.storage
-            .create_volume(request.volume_id as u64, &replica_replacement, 128, 128)?;
+        self.storage.create_volume(
+            request.volume_id as u64,
+            &replica_replacement,
+            request.max_volume_size,
+            request.max_needle_count,
+        )?;
 
         Ok(tonic::Response::new(
             weaver_proto::storage::AllocateVolumeResponse { status: None },

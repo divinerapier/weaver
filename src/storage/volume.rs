@@ -95,7 +95,7 @@ unsafe impl<C: super::index::Codec> Sync for Volume<C> {}
 
 pub struct VolumeAttibute {
     pub id: AtomicU64,
-    pub path: Arc<String>,
+    pub path: Arc<PathBuf>,
     pub max_length: AtomicU64,
 }
 
@@ -103,7 +103,7 @@ impl<C: IndexCodec> Volume<C> {
     pub fn id(&self) -> u64 {
         self.attibute.id.load(Ordering::Relaxed)
     }
-    pub fn path(&self) -> &str {
+    pub fn path(&self) -> &PathBuf {
         &self.attibute.path
     }
     pub fn max_length(&self) -> u64 {
@@ -196,130 +196,11 @@ impl<C> Volume<C>
 where
     C: IndexCodec,
 {
-    pub fn new(dir: &Path, id: u32, size: u64, codec: C) -> Result<Volume<C>> {
-        let volume_path: PathBuf = dir.join(format!("{}.data", id));
-        let index_path: PathBuf = dir.join(format!("{}.index", id));
-        if volume_path.exists() {
-            log::error!(
-                "couldn't create the volume on an existing path. path: {}",
-                volume_path.display()
-            );
-            return Err(storage_error!("exists volume data: {}", id));
-        }
-        if index_path.exists() {
-            log::error!(
-                "couldn't create the volume on an existing path. path: {}",
-                index_path.display()
-            );
-            return Err(storage_error!("exists volume index: {}", id));
-        }
-
-        let index = super::index::Index::new(&index_path, codec)?;
-        let (readonly_file, writable_file) = Self::open_volumes(&volume_path, true)?;
-        let current_length = writable_file.metadata()?.len();
-        Ok(Volume {
-            super_block: Arc::new(RwLock::new(SuperBlock::default())),
-            attibute: VolumeAttibute {
-                id: AtomicU64::new(id as u64),
-                path: Arc::new(
-                    volume_path
-                        .to_str()
-                        .ok_or(storage_error!("parse volume path: {:?}", volume_path))?
-                        .to_owned(),
-                ),
-                max_length: AtomicU64::new(size),
-            },
-            writable_volume: Arc::new(Mutex::new(writable_file)),
-            readonly_volume: Arc::new(readonly_file),
-            current_length: AtomicU64::new(current_length),
-            index,
-        })
-    }
-
-    /// open a physical volume file from disk
-    /// volume_path is the
-    pub fn open(volume_path: &Path, size: u64, codec: C) -> Result<Volume<C>> {
-        let extension = volume_path
-            .extension()
-            .ok_or(storage_error!("get file_stem from {:?}", volume_path))?;
-        if extension != "index" {
-            return Err(storage_error!("open path: {:?}", volume_path));
-        }
-        // filename should be a usize number
-        let volume_path_str = volume_path
-            .to_str()
-            .ok_or(storage_error!("std::path::Path -> &str. {:?}", volume_path))?;
-        let id = Self::parse_volume_file_stem_name(volume_path)?;
-        let extension_str = extension
-            .to_str()
-            .ok_or(storage_error!("std::path::Path -> &str. {:?}", extension))?;
-        let naive_volume_path_str = utils::strings::trim_suffix(volume_path_str, extension_str)?;
-        let index_file_str = naive_volume_path_str.to_owned() + "index";
-        let volume_file_str = naive_volume_path_str.to_owned() + "data";
-
-        // let (_, _, last_index) = Self::open_indexes(&index_file_str, false)?;
-        let index = super::index::Index::new(&index_file_str, codec)?;
-        let last_index = match *index.last_index() {
-            Some(last_index) => last_index,
-            None => super::index::Entry::default(),
-        };
-
-        let (readonly_file, writable_file) = Self::open_volumes(volume_file_str, false)?;
-        let current_length = writable_file.metadata()?.len();
-        if current_length != (last_index.offset + last_index.length) as u64 {
-            log::error!(
-                "volume data corruption. path: {}, current_length: {}, last_index.offset: {}, last_index.length: {}",
-                volume_path.display(),
-                current_length,
-                last_index.offset,
-                last_index.length
-            );
-            return Err(storage_error!(
-                "volume: {}, current length: {}, last_index.offset: {}, last_index.length: {}",
-                id,
-                current_length,
-                last_index.offset,
-                last_index.length
-            ));
-        }
-
-        Ok(Volume {
-            super_block: Arc::new(RwLock::new(SuperBlock::default())),
-            attibute: VolumeAttibute {
-                id: AtomicU64::new(id as u64),
-                path: Arc::new(
-                    volume_path
-                        .to_str()
-                        .ok_or(storage_error!("parse volume path: {:?}", volume_path))?
-                        .to_owned(),
-                ),
-                max_length: AtomicU64::new(size),
-            },
-            writable_volume: Arc::new(Mutex::new(writable_file)),
-            readonly_volume: Arc::new(readonly_file),
-            current_length: AtomicU64::new(current_length),
-            index,
-        })
-    }
-
-    fn path_exists(id: u32, path: &PathBuf) -> Result<()> {
-        if path.exists() {
-            log::error!("file exists. id: {}, path: {}", id, path.display());
-            return Err(storage_error!(
-                "exists volume file. id: {}, path: {:?}",
-                id,
-                path
-            ));
-        } else {
-            Ok(())
-        }
-    }
-
-    // Create a new volume on the specified directory with the id as its name.
-    // And set the size and replica replacement of the volume.
-    pub fn new2<P: AsRef<Path>>(
+    /// Create a new volume on the specified directory with the id as its name.
+    /// And set the size and replica replacement of the volume.
+    pub fn new<P: AsRef<Path>>(
         dir: P,
-        id: u32,
+        id: u64,
         size: u64,
         super_block: &SuperBlock,
         codec: C,
@@ -329,11 +210,23 @@ where
     {
         let volume_path: PathBuf = dir.as_ref().join(format!("{}.data", id));
         let index_path: PathBuf = dir.as_ref().join(format!("{}.index", id));
-        Self::path_exists(id, &volume_path)?;
-        Self::path_exists(id, &index_path)?;
-        // let (_, _, _) = Self::open_indexes(&index_path, true)?;
-        let (readonly_file, mut writable_file) = Self::open_volumes(&volume_path, true)?;
+        if volume_path.exists() {
+            log::error!(
+                "couldn't create a volume on an existing path. path: {}",
+                volume_path.display()
+            );
+            return Err(storage_error!("exists volume data: {}", id));
+        }
+        if index_path.exists() {
+            log::error!(
+                "couldn't create a volume on an existing path. path: {}",
+                index_path.display()
+            );
+            return Err(storage_error!("exists volume index: {}", id));
+        }
+        let (readonly_file, mut writable_file) = Self::open_volume(&volume_path, true)?;
 
+        // write super block to volume file
         super_block.write_to(&mut writable_file)?;
 
         let current_length = writable_file.metadata()?.len();
@@ -341,12 +234,7 @@ where
             super_block: Arc::new(RwLock::new(super_block.clone())),
             attibute: VolumeAttibute {
                 id: AtomicU64::new(id as u64),
-                path: Arc::new(
-                    volume_path
-                        .to_str()
-                        .ok_or(storage_error!("parse volume path: {:?}", volume_path))?
-                        .to_owned(),
-                ),
+                path: Arc::new(volume_path),
                 max_length: AtomicU64::new(size),
             },
             writable_volume: Arc::new(Mutex::new(writable_file)),
@@ -357,59 +245,72 @@ where
     }
 
     // Open the exist file.
-    pub fn open2(dir: &str, id: u64, size: u64, codec: C) -> Result<Volume<C>> {
-        // filename should be a usize number
-        let data_file_path = format!("{}/{}.data", dir, id);
-        let index_file_path = format!("{}/{}.index", dir, id);
+    pub fn open<P: AsRef<Path>>(dir: P, id: u64, size: u64, codec: C) -> Result<Volume<C>> {
+        // filename should be usize
+        let volume_path = dir.as_ref().join(format!("{}.data", id));
+        let index_path = dir.as_ref().join(format!("{}.index", id));
 
-        let (_, _, last_index) = Self::open_indexes(&index_file_path, false)?;
-        let (readonly_file, mut writable_file) = Self::open_volumes(&data_file_path, false)?;
-        let current_length = writable_file.metadata()?.len();
-        if current_length != (last_index.offset + last_index.length) as u64 {
+        if !volume_path.exists() {
             log::error!(
-                "volume data corruption. {}:{}, {}, current_length: {}, last_index.offset: {}, last_index.length: {}",
-                dir,
-                id,
-                data_file_path,
-                current_length,
-                last_index.offset,
-                last_index.length
+                "couldn't open the missing volume. path: {}",
+                volume_path.display()
             );
-            return Err(storage_error!(
-                "volume: {}, current length: {}, last_index.offset: {}, last_index.length: {}",
-                id,
-                current_length,
-                last_index.offset,
-                last_index.length
-            ));
+            return Err(storage_error!("exists volume data: {}", id));
         }
+        if !index_path.exists() {
+            log::error!(
+                "couldn't open the missing volume. path: {}",
+                index_path.display()
+            );
+            return Err(storage_error!("exists volume index: {}", id));
+        }
+        let index = Index::new(&index_path, codec)?;
 
+        let (readonly_file, mut writable_file) = Self::open_volume(&volume_path, false)?;
+        let current_length = writable_file.metadata()?.len();
         let super_block = SuperBlock::read_from(&mut writable_file)?;
 
-        Ok(Volume {
-            // FIXME: read super block from volume file
+        let v = Volume {
             super_block: Arc::new(RwLock::new(super_block)),
             attibute: VolumeAttibute {
                 id: AtomicU64::new(id as u64),
-                path: Arc::new(dir.to_owned()),
+                path: Arc::new(volume_path),
                 max_length: AtomicU64::new(size),
             },
             writable_volume: Arc::new(Mutex::new(writable_file)),
             readonly_volume: Arc::new(readonly_file),
             current_length: AtomicU64::new(current_length),
-            index: super::index::Index::new(&index_file_path, codec)?,
-        })
+            index,
+        };
+        v.validate()?;
+        Ok(v)
     }
 
-    fn parse_volume_file_stem_name(volume_path: &Path) -> Result<u32> {
-        let file_stem = volume_path
-            .file_stem()
-            .ok_or(error!("get file_stem from {:?}", volume_path))?;
-        let file_stem_str = file_stem
-            .to_str()
-            .ok_or(error!("&std::ffi::OsStr -> &str. {:?}", file_stem))?;
-        let id = file_stem_str.parse::<u32>()?;
-        Ok(id)
+    fn validate(&self) -> Result<()> {
+        let current_length = self.current_length();
+        match self.index.last_index()? {
+            None => {
+                // is a new volume, only superblock was written
+                if current_length > 24 {
+                    return Err(storage_error!(
+                        "last index is None. current length is {}",
+                        current_length
+                    ));
+                }
+                return Ok(());
+            }
+            Some(last_index) => {
+                if last_index.offset + last_index.length != current_length as usize {
+                    return Err(storage_error!(
+                        "last_index.offset is {}, last_index.length is {}, current length is {}",
+                        last_index.offset,
+                        last_index.length,
+                        current_length
+                    ));
+                }
+                return Ok(());
+            }
+        }
     }
 
     pub fn writable(&self) -> bool {
@@ -432,55 +333,20 @@ where
         }
     }
 
-    fn open_volumes<P: AsRef<Path>>(volume_filepath: P, new: bool) -> Result<(File, File)> {
+    fn open_volume<P: AsRef<Path>>(volume_filepath: P, new: bool) -> Result<(File, File)> {
         let writable_file: File = OpenOptions::new()
             .read(true)
             .write(true)
-            .append(true)
             .create(new)
-            .create_new(new)
-            .truncate(false)
+            .truncate(new)
+            .append(!new)
             .open(volume_filepath.as_ref())
-            .expect(&format!("volume filepath: {:?}", volume_filepath.as_ref()));
-        let readonly_file = writable_file.try_clone().expect(&format!(
-            "try clone volume filepath: {:?}",
-            volume_filepath.as_ref()
-        ));
-
+            .expect(&format!(
+                "volume filepath: {}",
+                volume_filepath.as_ref().display()
+            ));
+        let readonly_file = writable_file.try_clone()?;
         Ok((readonly_file, writable_file))
-    }
-
-    fn open_indexes<P: AsRef<Path>>(
-        filepath: P,
-        new: bool,
-    ) -> Result<(File, HashMap<u64, IndexEntry>, IndexEntry)> {
-        let index_file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(new)
-            .create_new(new)
-            .truncate(false)
-            .append(true)
-            .open(filepath.as_ref())?;
-
-        let mut index_map = HashMap::new();
-
-        if new {
-            return Ok((index_file, index_map, IndexEntry::default()));
-        }
-        let volume_id: u32 = Self::parse_volume_file_stem_name(filepath.as_ref())?;
-        let mut readonly_index_file = index_file.try_clone()?;
-        readonly_index_file.seek(SeekFrom::Start(0))?;
-        let reader = std::io::BufReader::new(readonly_index_file);
-        let indexes_reader = Deserializer::from_reader(reader).into_iter::<IndexEntry>();
-        let mut last_index = IndexEntry::default();
-        for index_result in indexes_reader {
-            let index: IndexEntry = index_result?;
-            last_index = index;
-            index_map.insert(index.needle_id, index);
-        }
-
-        Ok((index_file, index_map, last_index))
     }
 
     fn can_write(&self, _length: u64) -> bool {
@@ -494,7 +360,7 @@ where
             log::error!(
                 "couldn't write to the volume. id: {}, path: {}, writable: {}, max_length: {}, current_length: {}, actual_data_length: {}, total_length: {}",
                 self.id(),
-                self.path(),
+                self.path().display(),
                 self.writable(),
                 self.max_length(),
                 self.current_length(),

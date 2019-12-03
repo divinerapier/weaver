@@ -3,7 +3,7 @@ use crate::error::Result;
 
 use std::collections::HashMap;
 use std::io::Write;
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use byteorder::ByteOrder;
@@ -47,7 +47,7 @@ impl Codec for BinaryCodec {
 pub struct Index<C: Codec> {
     writer: Arc<Mutex<std::fs::File>>,
     indexes: Arc<RwLock<HashMap<u64, Entry>>>,
-    last: AtomicPtr<Option<Entry>>,
+    last_needle: AtomicU64,
     codec: C,
 }
 
@@ -60,20 +60,20 @@ impl<C: Codec> Index<C> {
             .append(true)
             .open(path.as_ref())?;
         let mut indexes = HashMap::new();
-        let mut last_index = None;
+        let mut last_needle = 0;
         let reader = file.try_clone()?;
 
         let indexes_reader = serde_json::Deserializer::from_reader(reader).into_iter::<Entry>();
         for index_result in indexes_reader {
-            let index = index_result?;
-            indexes.insert(index.needle_id, index);
-            last_index = Some(index);
+            let entry = index_result?;
+            indexes.insert(entry.needle_id, entry);
+            last_needle = entry.needle_id;
         }
 
         Ok(Index {
             writer: Arc::new(Mutex::new(file)),
             indexes: Arc::new(RwLock::new(indexes)),
-            last: AtomicPtr::new(&mut last_index as *mut Option<Entry>),
+            last_needle: AtomicU64::new(last_needle),
             codec,
         })
     }
@@ -87,9 +87,7 @@ impl<C: Codec> Index<C> {
         {
             let mut indexes = self.indexes.write().unwrap();
             indexes.insert(entry.needle_id, entry.clone());
-            let mut entry = Some(entry.clone());
-            self.last
-                .store(&mut entry as *mut Option<Entry>, Ordering::SeqCst);
+            self.last_needle.store(entry.needle_id, Ordering::SeqCst);
         }
         Ok(())
     }
@@ -102,9 +100,12 @@ impl<C: Codec> Index<C> {
         }
     }
 
-    pub fn last_index(&self) -> Box<Option<Entry>> {
-        let entry: *mut Option<Entry> = self.last.load(Ordering::SeqCst);
-        unsafe { Box::from_raw(entry) }
+    pub fn last_index(&self) -> Result<Option<Entry>> {
+        let last_needle = self.last_needle.load(Ordering::SeqCst);
+        if last_needle == 0 {
+            return Ok(None);
+        }
+        self.read(last_needle).map(|entry| Some(entry))
     }
 }
 

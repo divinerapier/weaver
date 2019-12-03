@@ -77,7 +77,7 @@ impl InnerStorage {
                 Some((index as u64, index_file_name))
             })
             .map(|(idx, _index_file_name)| {
-                let volume_result = Volume::open2(dir, idx, 128, index::JSONCodec);
+                let volume_result = Volume::open(dir, idx, 128, index::JSONCodec);
                 (idx, volume_result)
             })
             .filter(|(_, volume_result)| volume_result.is_ok())
@@ -138,10 +138,10 @@ impl Storage {
         }
         let super_block =
             volume::SuperBlock::new(&replica_replacement, max_volume_size, max_needle_count);
-        let volume = Volume::new2(
+        let volume = Volume::new(
             &storage.directory,
-            volume_id as u32,
-            128,
+            volume_id,
+            max_volume_size as u64,
             &super_block,
             index::JSONCodec,
         )?;

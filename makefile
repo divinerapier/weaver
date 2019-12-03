@@ -27,7 +27,7 @@ release-master: release-library
 release-directory: release-library
 	cargo build --release --package weaver-directory
 
-test: library
+test: build-library
 	RUST_BACKTRACE=full cargo test -- --nocapture
 	
 build-proto: format
@@ -38,3 +38,5 @@ release-proto: format
 
 format:
 	cargo fmt
+
+proto: build-proto release-proto
