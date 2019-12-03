@@ -46,7 +46,6 @@ impl Codec for BinaryCodec {
 
 pub struct Index<C: Codec> {
     writer: Arc<Mutex<std::fs::File>>,
-    reader: std::fs::File,
     indexes: Arc<RwLock<HashMap<u64, Entry>>>,
     last: AtomicPtr<Option<Entry>>,
     codec: C,
@@ -61,10 +60,8 @@ impl<C: Codec> Index<C> {
             .append(true)
             .open(path.as_ref())?;
         let mut indexes = HashMap::new();
-        let reader = file.try_clone()?;
-        let cloned_file = file.try_clone()?;
-
         let mut last_index = None;
+        let reader = file.try_clone()?;
 
         let indexes_reader = serde_json::Deserializer::from_reader(reader).into_iter::<Entry>();
         for index_result in indexes_reader {
@@ -74,7 +71,6 @@ impl<C: Codec> Index<C> {
         }
 
         Ok(Index {
-            reader: cloned_file,
             writer: Arc::new(Mutex::new(file)),
             indexes: Arc::new(RwLock::new(indexes)),
             last: AtomicPtr::new(&mut last_index as *mut Option<Entry>),
@@ -85,17 +81,15 @@ impl<C: Codec> Index<C> {
     pub fn write(&self, entry: &Entry) -> Result<()> {
         {
             let data = self.codec.encode(entry).unwrap();
-            let mut w: std::sync::MutexGuard<'_, std::fs::File> = self.writer.lock().unwrap();
+            let mut w = self.writer.lock().unwrap();
             w.write_all(&data)?;
         }
         {
-            let mut indexes: std::sync::RwLockWriteGuard<
-                '_,
-                std::collections::HashMap<u64, Entry>,
-            > = self.indexes.write().unwrap();
+            let mut indexes = self.indexes.write().unwrap();
             indexes.insert(entry.needle_id, entry.clone());
             let mut entry = Some(entry.clone());
-            self.last.store(&mut entry as *mut Option<Entry>, Ordering::SeqCst);
+            self.last
+                .store(&mut entry as *mut Option<Entry>, Ordering::SeqCst);
         }
         Ok(())
     }
@@ -110,9 +104,7 @@ impl<C: Codec> Index<C> {
 
     pub fn last_index(&self) -> Box<Option<Entry>> {
         let entry: *mut Option<Entry> = self.last.load(Ordering::SeqCst);
-        unsafe {
-            Box::from_raw(entry)
-        }
+        unsafe { Box::from_raw(entry) }
     }
 }
 

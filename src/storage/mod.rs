@@ -12,7 +12,7 @@ pub mod volume;
 
 /// Storage consists of many volumes.
 struct InnerStorage {
-    /// the directory
+    /// location to store volumes
     pub directory: PathBuf,
 
     /// all volumes on storage
@@ -23,9 +23,6 @@ struct InnerStorage {
     pub ip: String,
     pub port: u16,
 
-    /// the max volume id of storage
-    pub latest_volume_id: u64,
-
     pub writable_volumes: HashSet<u64>,
     pub readonly_volumes: HashSet<u64>,
 }
@@ -35,7 +32,6 @@ impl InnerStorage {
     // Open if there are some volumes located at.
     pub fn open(dir: &str, ip: &str, port: u16) -> Result<InnerStorage> {
         let dir_result = std::fs::read_dir(dir)?;
-        let mut latest_volume_id = 0;
 
         let index_files = dir_result
             .filter_map(|entry| {
@@ -82,9 +78,6 @@ impl InnerStorage {
             })
             .map(|(idx, _index_file_name)| {
                 let volume_result = Volume::open2(dir, idx, 128, index::JSONCodec);
-                if idx > latest_volume_id {
-                    latest_volume_id = idx;
-                }
                 (idx, volume_result)
             })
             .filter(|(_, volume_result)| volume_result.is_ok())
@@ -113,7 +106,6 @@ impl InnerStorage {
             volumes,
             ip: ip.to_owned(),
             port,
-            latest_volume_id,
             writable_volumes,
             readonly_volumes,
         })

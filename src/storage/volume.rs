@@ -1,8 +1,7 @@
 use crate::error::Result;
 use crate::needle::{Needle, NeedleBody, NeedleHeader};
+use crate::storage::index::{Codec as IndexCodec, Entry as IndexEntry, Index};
 use crate::utils;
-
-use super::index::Entry as IndexEntry;
 
 use bytes::ByteOrder;
 
@@ -88,7 +87,7 @@ pub struct Volume<C: super::index::Codec> {
     pub writable_volume: Arc<Mutex<File>>,
     pub readonly_volume: Arc<File>,
     pub current_length: AtomicU64,
-    pub index: super::index::Index<C>,
+    pub index: Index<C>,
 }
 
 unsafe impl<C: super::index::Codec> Send for Volume<C> {}
@@ -100,7 +99,7 @@ pub struct VolumeAttibute {
     pub max_length: AtomicU64,
 }
 
-impl<C: super::index::Codec> Volume<C> {
+impl<C: IndexCodec> Volume<C> {
     pub fn id(&self) -> u64 {
         self.attibute.id.load(Ordering::Relaxed)
     }
@@ -195,7 +194,7 @@ impl From<&[u8]> for SuperBlock {
 
 impl<C> Volume<C>
 where
-    C: super::index::Codec,
+    C: IndexCodec,
 {
     pub fn new(dir: &Path, id: u32, size: u64, codec: C) -> Result<Volume<C>> {
         let volume_path: PathBuf = dir.join(format!("{}.data", id));
@@ -399,8 +398,6 @@ where
             readonly_volume: Arc::new(readonly_file),
             current_length: AtomicU64::new(current_length),
             index: super::index::Index::new(&index_file_path, codec)?,
-            // index_file: Arc::new(Mutex::new(index_file)),
-            // indexes: Arc::new(RwLock::new(index_map)),
         })
     }
 
@@ -552,16 +549,9 @@ where
 
         {
             self.index.write(&index)?;
-            // let mut index_file = self.index_file.lock().unwrap();
-            // index_file.write_all(serde_json::to_string(&index)?.as_bytes())?;
             self.current_length
                 .fetch_add(total_length as u64, Ordering::SeqCst);
         }
-        // let mut indexes = self.indexes.write().unwrap();
-        // indexes.insert(
-        //     needle_id,
-        //     IndexEntry::new(needle_id, index.offset, index.length),
-        // );
         Ok(())
     }
 
@@ -609,33 +599,14 @@ where
 
         {
             self.index.write(&index)?;
-            // let mut index_file = self.index_file.lock().unwrap();
-            // index_file.write_all(serde_json::to_string(&index)?.as_bytes())?;
         }
         self.current_length
             .fetch_add(needle.total_size, Ordering::SeqCst);
-        // {
-        //     let mut indexes = self.indexes.write().unwrap();
-        //     indexes.insert(
-        //         needle.id,
-        //         IndexEntry::new(needle.id, index.offset, index.length),
-        //     );
-        // }
         Ok(())
     }
 
     pub fn get(&self, needle_id: u64) -> Result<Needle> {
         let index: IndexEntry = self.index.read(needle_id)?;
-
-        // let indexes = self.indexes.read().unwrap();
-        // let index: IndexEntry = indexes
-        //     .get(&needle_id)
-        //     .ok_or(storage_error!(
-        //         "needle not in indexes: {}, indexes: {:?}",
-        //         needle_id,
-        //         self.indexes
-        //     ))?
-        //     .clone();
         log::debug!("index: {:?}", index);
         if ((index.offset + index.length) as u64) > self.current_length() {
             log::error!(
@@ -646,10 +617,6 @@ where
                 index.length
             );
             return Err(storage_error!("data corruption. needle: {}", needle_id));
-            // return Err(Error::data_corruption(
-            //     needle_id.to_string(),
-            //     "index out of current length",
-            // ));
         }
         Ok(self.read_needle(&index)?)
     }
@@ -659,7 +626,6 @@ where
         buffer.resize(26, 0);
         file.seek(std::io::SeekFrom::Start(offset as u64))?;
         file.read_exact(&mut buffer)?;
-        // automatically provides the implementation of [`Into`]
         Ok(buffer.into())
     }
 
