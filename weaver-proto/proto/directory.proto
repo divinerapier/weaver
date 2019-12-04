@@ -30,16 +30,11 @@ service Directory {
 // LookupEntryRequest is the type of message used to look up an entry
 // with a given directory and name.
 message LookupEntryRequest {
-  // lookup in
-  string directory = 1;
-
-  // name of entry
-  string name = 2;
+  string key = 1;
 }
 
 message LookupEntryResponse {
-  weaver.Status status = 1;
-  Entry entry = 2;
+  weaver.Entry entry = 1;
 }
 
 message ListEntriesRequest {

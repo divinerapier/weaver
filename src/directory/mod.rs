@@ -1,4 +1,4 @@
 pub mod service;
 pub mod storage;
 
-pub use storage::{Chunk, Directory, DirectoryStorage};
+pub use storage::{Chunk, DirectoryStorage};

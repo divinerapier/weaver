@@ -10,8 +10,7 @@ pub struct DirectoryService<S>
 where
     S: crate::directory::DirectoryStorage,
 {
-    /// map volume id to locations
-    pub storage: crate::directory::storage::Directory<S>,
+    pub storage: S,
 }
 
 impl<S> DirectoryService<S>
@@ -22,9 +21,7 @@ where
     where
         S: crate::directory::storage::DirectoryStorage,
     {
-        DirectoryService {
-            storage: crate::directory::storage::Directory::new(storage),
-        }
+        DirectoryService { storage }
     }
 }
 
@@ -35,9 +32,25 @@ where
 {
     async fn lookup_entry(
         &self,
-        _request: tonic::Request<weaver_proto::directory::LookupEntryRequest>,
+        request: tonic::Request<weaver_proto::directory::LookupEntryRequest>,
     ) -> Result<tonic::Response<weaver_proto::directory::LookupEntryResponse>, tonic::Status> {
-        Err(tonic::Status::unimplemented("Not yet implemented"))
+        use super::Chunk;
+        use weaver_proto::directory::{LookupEntryRequest, LookupEntryResponse};
+        use weaver_proto::weaver::Entry;
+        let request: LookupEntryRequest = request.into_inner();
+        let key: String = request.key;
+        Ok(tonic::Response::new(LookupEntryResponse {
+            entry: self.storage.retrieve(&key).await?.map(|chunks| {
+                let chunks: Vec<Chunk> = chunks;
+                {
+                    Entry {
+                        key,
+                        attribute: None,
+                        chunks,
+                    }
+                }
+            }),
+        }))
     }
     async fn list_entries(
         &self,

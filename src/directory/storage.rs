@@ -11,38 +11,22 @@ use futures::{Stream, StreamExt};
 use rose_tree::petgraph::graph::{DefaultIx, NodeIndex};
 use rose_tree::RoseTree;
 
-#[derive(Clone)]
-pub struct Chunk {
-    pub id: u64,
-    pub volume_id: u64,
-    pub needle_id: u64,
-}
-
-/// Directory is a manager that keep the mapper from
-/// filepath to its chunks
-pub struct Directory<S>
-where
-    S: DirectoryStorage,
-{
-    storage: S,
-}
+pub type Chunk = weaver_proto::weaver::Chunk;
 
 #[tonic::async_trait]
 pub trait DirectoryStorage: Send + Sync {
     async fn create(&mut self, key: &str, chunks: Vec<Chunk>) -> Result<()>;
     async fn update(&mut self, key: &str, chunks: Vec<Chunk>) -> Result<()>;
+
+    /// Retrieve chunks of the target key.
+    ///
+    /// Ok(Some()): if target key is an regular file object.
+    /// Ok(None): if target key is a directory.
+    /// Err(_): if any error occurs such as key not found.
+    ///
     async fn retrieve(&self, key: &str) -> Result<Option<Vec<Chunk>>>;
     async fn delete(&mut self, key: &str) -> Result<()>;
     async fn list<'a>(&'a self, key: &str) -> Result<Box<dyn Stream<Item = Result<String>> + 'a>>;
-}
-
-impl<S> Directory<S>
-where
-    S: DirectoryStorage,
-{
-    pub fn new(storage: S) -> Directory<S> {
-        Directory { storage }
-    }
 }
 
 #[derive(Copy, Clone)]
