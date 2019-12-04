@@ -2,7 +2,7 @@
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     log::set_max_level(log::LevelFilter::max());
-    let storage = weaver::directory::MemoryDirectoryStorage::new();
+    let storage = weaver::directory::storage::MemoryDirectoryStorage::new();
     let svc = weaver_proto::directory::server::DirectoryServer::new(
         weaver::directory::service::DirectoryService::new(storage),
     );

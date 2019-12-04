@@ -11,7 +11,7 @@ where
     S: crate::directory::DirectoryStorage,
 {
     /// map volume id to locations
-    pub storage: crate::directory::Directory<S>,
+    pub storage: crate::directory::storage::Directory<S>,
 }
 
 impl<S> DirectoryService<S>
@@ -20,10 +20,10 @@ where
 {
     pub fn new(storage: S) -> DirectoryService<S>
     where
-        S: crate::directory::DirectoryStorage,
+        S: crate::directory::storage::DirectoryStorage,
     {
         DirectoryService {
-            storage: crate::directory::Directory::new(storage),
+            storage: crate::directory::storage::Directory::new(storage),
         }
     }
 }
