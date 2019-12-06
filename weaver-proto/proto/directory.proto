@@ -9,7 +9,7 @@ service Directory {
   //
   rpc LookupEntry(LookupEntryRequest) returns (LookupEntryResponse) {}
 
-  rpc ListEntries(ListEntriesRequest) returns (ListEntriesResponse) {}
+  rpc ListEntries(ListEntriesRequest) returns (stream ListEntriesResponse) {}
 
   rpc CreateEntry(CreateEntryRequest) returns (CreateEntryResponse) {}
 
@@ -40,20 +40,18 @@ message LookupEntryResponse {
 message ListEntriesRequest {
   string directory = 1;
 
-  // begin at
-  string offset = 2;
-  uint32 limit = 3;
+  uint64 offset = 2;
+  uint64 limit = 3;
 }
 
 message ListEntriesResponse {
-  weaver.Status status = 1;
-  repeated Entry entries = 2;
-  string next = 3;
+//   repeated weaver.Entry entries = 1;
+    string entry = 1;
 }
 
 message CreateEntryRequest {
   string directory = 1;
-  Entry entry = 2;
+  weaver.Entry entry = 2;
 }
 
 message CreateEntryResponse {}
@@ -62,6 +60,7 @@ message UpdateEntryRequest {
   string directory = 1;
   Entry entry = 2;
 }
+
 message UpdateEntryResponse {}
 
 message DeleteEntryRequest {

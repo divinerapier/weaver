@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::marker::{Send, Sync};
 use std::ops::{Index, IndexMut};
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
 use futures::{Stream, StreamExt};
@@ -12,6 +13,7 @@ use rose_tree::petgraph::graph::{DefaultIx, NodeIndex};
 use rose_tree::RoseTree;
 
 pub type Chunk = weaver_proto::weaver::Chunk;
+pub type Entry = weaver_proto::weaver::Entry;
 
 #[tonic::async_trait]
 pub trait DirectoryStorage: Send + Sync {
@@ -25,8 +27,15 @@ pub trait DirectoryStorage: Send + Sync {
     /// Err(_): if any error occurs such as key not found.
     ///
     async fn retrieve(&self, key: &str) -> Result<Option<Vec<Chunk>>>;
+
     async fn delete(&mut self, key: &str) -> Result<()>;
-    async fn list<'a>(&'a self, key: &str) -> Result<Box<dyn Stream<Item = Result<String>> + 'a>>;
+
+    async fn list<'a>(
+        &'a self,
+        key: &str,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = String> + 'a>>;
 }
 
 #[derive(Copy, Clone)]
@@ -80,7 +89,12 @@ impl MemoryDirectoryStorage {
 
 #[tonic::async_trait]
 impl DirectoryStorage for MemoryDirectoryStorage {
-    async fn list<'a>(&'a self, key: &str) -> Result<Box<dyn Stream<Item = Result<String>> + 'a>> {
+    async fn list<'a>(
+        &'a self,
+        key: &str,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = String> + 'a>> {
         let index: Option<_> = self.entries.get(key);
         if index.is_none() {
             return Err(directory_error!("unknown key. {}", key));
@@ -88,12 +102,19 @@ impl DirectoryStorage for MemoryDirectoryStorage {
         let index = *index.unwrap();
         let children = self.tree.children(index);
         let index2entry = self.index2entry.clone();
-        let fu = futures::stream::iter(children).map(move |index| {
-            let index2entry = index2entry.read().unwrap();
-            let entry: &str = index2entry.index(&index);
-            Ok(entry.to_owned())
-        });
-        Ok(Box::new(fu))
+
+        let children = children
+            .skip(offset as usize)
+            .enumerate()
+            .filter(move |(i, _)| *i < limit as usize)
+            .map(move |(_, index)| {
+                let index2entry = index2entry.read().unwrap();
+                let entry: &str = index2entry.index(&index);
+                entry.to_owned()
+            });
+        let children = Box::new(children) as Box<dyn Iterator<Item = String>>;
+
+        Ok(children)
     }
 
     async fn create(&mut self, key: &str, chunks: Vec<Chunk>) -> Result<()> {

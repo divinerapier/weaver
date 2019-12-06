@@ -19,7 +19,7 @@ impl StorageService {
 }
 
 #[tonic::async_trait]
-impl weaver_proto::storage::server::Storage for StorageService {
+impl weaver_proto::storage::storage_server::Storage for StorageService {
     /// Create a new volume with the specified replica replacement.
     async fn allocate_volume(
         &self,

@@ -6,7 +6,7 @@ rust:
 before_install:
     - rustup toolchain remove stable
     - rustup toolchain remove beta
-    - rustup default beta
+    - rustup default nightly-2019-11-25
     - rustup component add cargo clippy rustc rustfmt
     - rustup show
 

@@ -1,11 +1,17 @@
+use weaver_proto::directory::*;
+
 use std::collections::HashMap;
 use std::path::Path;
+use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, RwLock,
 };
-use tokio::sync::mpsc;
+
+use futures::future::FutureExt;
+use futures::Stream;
 use tonic::{Request, Response, Status};
+
 pub struct DirectoryService<S>
 where
     S: crate::directory::DirectoryStorage,
@@ -13,7 +19,7 @@ where
     pub storage: S,
 }
 
-impl<S> DirectoryService<S>
+impl<'a, S> DirectoryService<S>
 where
     S: crate::directory::DirectoryStorage,
 {
@@ -26,20 +32,19 @@ where
 }
 
 #[tonic::async_trait]
-impl<S> weaver_proto::directory::server::Directory for DirectoryService<S>
+impl<S> directory_server::Directory for DirectoryService<S>
 where
     S: crate::directory::DirectoryStorage + 'static,
 {
     async fn lookup_entry(
         &self,
-        request: tonic::Request<weaver_proto::directory::LookupEntryRequest>,
-    ) -> Result<tonic::Response<weaver_proto::directory::LookupEntryResponse>, tonic::Status> {
+        request: Request<LookupEntryRequest>,
+    ) -> Result<Response<LookupEntryResponse>, Status> {
         use super::Chunk;
-        use weaver_proto::directory::{LookupEntryRequest, LookupEntryResponse};
         use weaver_proto::weaver::Entry;
         let request: LookupEntryRequest = request.into_inner();
         let key: String = request.key;
-        Ok(tonic::Response::new(LookupEntryResponse {
+        Ok(Response::new(LookupEntryResponse {
             entry: self.storage.retrieve(&key).await?.map(|chunks| {
                 let chunks: Vec<Chunk> = chunks;
                 {
@@ -52,47 +57,63 @@ where
             }),
         }))
     }
+
+    type ListEntriesStream =
+        Pin<Box<dyn Stream<Item = Result<ListEntriesResponse, Status>> + Send + Sync + 'static>>;
+
     async fn list_entries(
         &self,
-        _request: tonic::Request<weaver_proto::directory::ListEntriesRequest>,
-    ) -> Result<tonic::Response<weaver_proto::directory::ListEntriesResponse>, tonic::Status> {
-        Err(tonic::Status::unimplemented("Not yet implemented"))
+        request: Request<ListEntriesRequest>,
+    ) -> Result<Response<Self::ListEntriesStream>, tonic::Status> {
+        let request = request.into_inner();
+        let children = self
+            .storage
+            .list(&request.directory, request.offset, request.limit)
+            .await?;
+
+        let iter = children.map(|child| Ok(ListEntriesResponse { entry: child }));
+
+        let entries: Vec<Result<ListEntriesResponse, Status>> = iter.collect();
+
+        Ok(Response::new(
+            Box::pin(futures::stream::iter(entries)) as Self::ListEntriesStream
+        ))
     }
+
     async fn create_entry(
         &self,
-        _request: tonic::Request<weaver_proto::directory::CreateEntryRequest>,
-    ) -> Result<tonic::Response<weaver_proto::directory::CreateEntryResponse>, tonic::Status> {
+        _request: Request<CreateEntryRequest>,
+    ) -> Result<Response<CreateEntryResponse>, Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn update_entry(
         &self,
-        _request: tonic::Request<weaver_proto::directory::UpdateEntryRequest>,
-    ) -> Result<tonic::Response<weaver_proto::directory::UpdateEntryResponse>, tonic::Status> {
+        _request: Request<UpdateEntryRequest>,
+    ) -> Result<Response<UpdateEntryResponse>, Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn delete_entry(
         &self,
-        _request: tonic::Request<weaver_proto::directory::DeleteEntryRequest>,
-    ) -> Result<tonic::Response<weaver_proto::directory::DeleteEntryResponse>, tonic::Status> {
+        _request: Request<DeleteEntryRequest>,
+    ) -> Result<Response<DeleteEntryResponse>, Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn assign_volume(
         &self,
-        _request: tonic::Request<weaver_proto::directory::AssignVolumeRequest>,
-    ) -> Result<tonic::Response<weaver_proto::directory::AssignVolumeResponse>, tonic::Status> {
+        _request: Request<AssignVolumeRequest>,
+    ) -> Result<Response<AssignVolumeResponse>, Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn lookup_volume(
         &self,
-        _request: tonic::Request<weaver_proto::directory::LookupVolumeRequest>,
-    ) -> Result<tonic::Response<weaver_proto::directory::LookupVolumeResponse>, tonic::Status> {
+        _request: Request<LookupVolumeRequest>,
+    ) -> Result<Response<LookupVolumeResponse>, Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn delete_collection(
         &self,
-        _request: tonic::Request<weaver_proto::directory::DeleteCollectionRequest>,
-    ) -> Result<tonic::Response<weaver_proto::directory::DeleteCollectionResponse>, tonic::Status>
-    {
+        _request: Request<DeleteCollectionRequest>,
+    ) -> Result<Response<DeleteCollectionResponse>, Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
     async fn statistics(

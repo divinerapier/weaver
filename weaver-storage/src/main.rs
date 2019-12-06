@@ -36,11 +36,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     log::set_max_level(log::LevelFilter::max());
-    let svc = weaver_proto::storage::server::StorageServer::new(
+    let svc = weaver_proto::storage::storage_server::StorageServer::new(
         weaver::storage::service::StorageService::new("/data/weaver/", ip, port),
     );
     tonic::transport::Server::builder()
-        .serve(format!("{}:{}", ip, port).parse().unwrap(), svc)
+        .add_service(svc)
+        .serve(format!("{}:{}", ip, port).parse().unwrap())
         .await?;
     Ok(())
 }

@@ -23,7 +23,7 @@ impl MasterService {
 }
 
 #[tonic::async_trait]
-impl weaver_proto::master::server::Master for MasterService {
+impl weaver_proto::master::master_server::Master for MasterService {
     #[doc = "Server streaming response type for the SendHeartbeat method."]
     type HeartbeatStream =
         tokio::sync::mpsc::Receiver<Result<weaver_proto::master::HeartbeatResponse, Status>>;
