@@ -58,15 +58,6 @@ where
         }))
     }
 
-    // type ListEntriesStream = Pin<
-    //     Box<
-    //         dyn Stream<Item = Result<weaver_proto::directory::ListEntriesResponse, tonic::Status>>
-    //             + Send
-    //             + Sync
-    //             + 'static,
-    //     >,
-    // >;
-
     type ListEntriesStream =
         Pin<Box<dyn Stream<Item = Result<ListEntriesResponse, Status>> + Send + Sync + 'static>>;
 
@@ -74,32 +65,19 @@ where
         &self,
         request: Request<ListEntriesRequest>,
     ) -> Result<Response<Self::ListEntriesStream>, tonic::Status> {
-        // use futures::stream::StreamExt;
-        // let request = request.into_inner();
-        // let stream = self
-        //     .storage
-        //     .list(&request.directory, request.offset, request.limit)
-        //     .await?;
+        let request = request.into_inner();
+        let children: Vec<String> = self
+            .storage
+            .list(&request.directory, request.offset, request.limit)
+            .await?;
 
-        // let iter = stream
-        //     .map(move |entry| {
-        //         let entry = entry.unwrap();
-        //         Ok(ListEntriesResponse { entry })
-        //     })
-        //     .collect::<Vec<Result<ListEntriesResponse, Status>>>()
-        //     .await;
+        let iter = children
+            .into_iter()
+            .map(|child| Ok(ListEntriesResponse { entry: child }));
 
-        // // let iter = stream.map(move |entry| {
-        // //     let entry = entry.unwrap();
-        // //     Ok(ListEntriesResponse {
-        // //         entry,
-        // //     })
-        // // });
-
-        // Ok(Response::new(
-        //     Box::pin(futures::stream::iter(iter)) as Self::ListEntriesStream
-        // ))
-        Err(tonic::Status::unimplemented("Not yet implemented"))
+        Ok(Response::new(
+            Box::pin(futures::stream::iter(iter)) as Self::ListEntriesStream
+        ))
     }
 
     async fn create_entry(

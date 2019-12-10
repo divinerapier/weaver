@@ -30,12 +30,7 @@ pub trait DirectoryStorage: Send + Sync {
 
     async fn delete(&mut self, key: &str) -> Result<()>;
 
-    async fn list(
-        &self,
-        key: &str,
-        offset: u64,
-        limit: u64,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<String>> + 'static>>>;
+    async fn list(&self, key: &str, offset: u64, limit: u64) -> Result<Vec<String>>;
 }
 
 #[derive(Copy, Clone)]
@@ -89,12 +84,7 @@ impl MemoryDirectoryStorage {
 
 #[tonic::async_trait]
 impl DirectoryStorage for MemoryDirectoryStorage {
-    async fn list(
-        &self,
-        key: &str,
-        offset: u64,
-        limit: u64,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<String>> + 'static>>> {
+    async fn list(&self, key: &str, offset: u64, limit: u64) -> Result<Vec<String>> {
         let index: Option<_> = self.entries.get(key);
         if index.is_none() {
             return Err(directory_error!("unknown key. {}", key));
@@ -103,18 +93,18 @@ impl DirectoryStorage for MemoryDirectoryStorage {
         let children = self.tree.children(index);
         let index2entry = self.index2entry.clone();
 
-        let children: Vec<NodeIndex> = children
+        let children: Vec<String> = children
             .skip(offset as usize)
             .enumerate()
             .filter(move |(i, _)| *i < limit as usize)
-            .map(|(_, index)| index)
+            .map(move |(_, index)| {
+                let index2entry = index2entry.read().unwrap();
+                let entry: &str = index2entry.index(&index);
+                entry.to_owned()
+            })
             .collect();
-        let fu = futures::stream::iter(children.into_iter().map(move |index| {
-            let index2entry = index2entry.read().unwrap();
-            let entry: &str = index2entry.index(&index);
-            Ok(entry.to_owned())
-        }));
-        Ok(Box::pin(fu))
+
+        Ok(children)
     }
 
     async fn create(&mut self, key: &str, chunks: Vec<Chunk>) -> Result<()> {
