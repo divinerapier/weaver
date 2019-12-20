@@ -66,17 +66,17 @@ where
         request: Request<ListEntriesRequest>,
     ) -> Result<Response<Self::ListEntriesStream>, tonic::Status> {
         let request = request.into_inner();
-        let children: Vec<String> = self
+        let children = self
             .storage
             .list(&request.directory, request.offset, request.limit)
             .await?;
 
-        let iter = children
-            .into_iter()
-            .map(|child| Ok(ListEntriesResponse { entry: child }));
+        let iter = children.map(|child| Ok(ListEntriesResponse { entry: child }));
+
+        let entries: Vec<Result<ListEntriesResponse, Status>> = iter.collect();
 
         Ok(Response::new(
-            Box::pin(futures::stream::iter(iter)) as Self::ListEntriesStream
+            Box::pin(futures::stream::iter(entries)) as Self::ListEntriesStream
         ))
     }
 
