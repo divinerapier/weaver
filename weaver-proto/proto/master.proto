@@ -5,59 +5,62 @@ package weaver.master;
 import "weaver.proto";
 
 service Master {
-  rpc Heartbeat(stream HeartbeatRequest) returns (stream HeartbeatResponse) {}
-  rpc LookupVolume(LookupVolumeRequest) returns (LookupVolumeResponse) {}
-  rpc Assign(AssignRequest) returns (AssignResponse) {}
+    rpc Heartbeat (stream HeartbeatRequest) returns (stream HeartbeatResponse) {
+    }
+    rpc LookupVolume (LookupVolumeRequest) returns (LookupVolumeResponse) {
+    }
+    rpc Assign (AssignRequest) returns (AssignResponse) {
+    }
 }
 
 message HeartbeatRequest {
-  string ip = 1;
-  uint32 port = 2;
-  string presigned_url = 3;
-  uint32 max_volume_count = 4;
-  uint64 max_file_key = 5;
-  string data_center = 6;
-  string rack = 7;
-  uint32 admin_port = 8;
-  repeated weaver.VolumeInformationMessage volumes = 9;
-  repeated weaver.VolumeShortInformationMessage new_volumes = 10;
-  repeated weaver.VolumeShortInformationMessage deleted_volumes = 11;
-  bool has_no_volumes = 12;
+    string ip = 1;
+    uint32 port = 2;
+    string presigned_url = 3;
+    uint32 max_volume_count = 4;
+    uint64 max_file_key = 5;
+    string data_center = 6;
+    string rack = 7;
+    uint32 admin_port = 8;
+    repeated weaver.VolumeInformationMessage volumes = 9;
+    repeated weaver.VolumeShortInformationMessage new_volumes = 10;
+    repeated weaver.VolumeShortInformationMessage deleted_volumes = 11;
+    bool has_no_volumes = 12;
 }
 
 message HeartbeatResponse {
-  uint64 volume_size_limit = 1;
-  string leader = 2;
-  string metrics_address = 3;
-  uint32 metrics_interval_seconds = 4;
+    uint64 volume_size_limit = 1;
+    string leader = 2;
+    string metrics_address = 3;
+    uint32 metrics_interval_seconds = 4;
 }
 
 message LookupVolumeRequest {
-  repeated int64 volumes = 1;
+    repeated int64 volumes = 1;
 }
 
 message LookupVolumeResponse {
-  message VolumeLocation {
-    int64 volume_id = 1;
-    repeated Location locations = 2;
-    string error = 3;
-  }
-  repeated VolumeLocation volume_locations = 1;
+    message VolumeLocation {
+        int64 volume_id = 1;
+        repeated Location locations = 2;
+        string error = 3;
+    }
+    repeated VolumeLocation volume_locations = 1;
 }
 
 message AssignRequest {
-  uint64 count = 1;
-  weaver.ReplicaReplacement replica_replacement = 2;
-  string data_center = 5;
-  string rack = 6;
-  string data_node = 7;
+    uint64 count = 1;
+    weaver.ReplicaReplacement replica_replacement = 2;
+    string data_center = 5;
+    string rack = 6;
+    string data_node = 7;
 }
 
 message AssignResponse {
-  string fid = 1;
-  string url = 2;
-  string presigned_url = 3;
-  uint64 count = 4;
-  string error = 5;
-  string auth = 6;
+    string fid = 1;
+    string url = 2;
+    string presigned_url = 3;
+    uint64 count = 4;
+    string error = 5;
+    string auth = 6;
 }

@@ -1,12 +1,12 @@
 use std::sync::mpsc;
 
-mod directory_error;
-mod master_error;
-mod storage_error;
-
 pub use directory_error::DirectoryError;
 pub use master_error::MasterError;
 pub use storage_error::StorageError;
+
+mod directory_error;
+mod master_error;
+mod storage_error;
 
 pub enum Error {
     Master(String),
@@ -43,6 +43,7 @@ impl std::fmt::Debug for Error {
 }
 
 unsafe impl Send for Error {}
+
 unsafe impl Sync for Error {}
 
 impl std::error::Error for Error {}

@@ -1,10 +1,3 @@
-use crate::error::Result;
-use crate::needle::{Needle, NeedleBody, NeedleHeader};
-use crate::storage::index::{Codec as IndexCodec, Entry as IndexEntry, Index};
-use crate::utils;
-
-use bytes::ByteOrder;
-
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
@@ -15,7 +8,13 @@ use std::sync::{
     Arc, Mutex, RwLock,
 };
 
+use bytes::ByteOrder;
 use serde_json::Deserializer;
+
+use crate::error::Result;
+use crate::needle::{Needle, NeedleBody, NeedleHeader};
+use crate::storage::index::{Codec as IndexCodec, Entry as IndexEntry, Index};
+use crate::utils;
 
 pub enum VolumeExtension {
     Index = 1,
@@ -91,6 +90,7 @@ pub struct Volume<C: super::index::Codec> {
 }
 
 unsafe impl<C: super::index::Codec> Send for Volume<C> {}
+
 unsafe impl<C: super::index::Codec> Sync for Volume<C> {}
 
 pub struct VolumeAttibute {

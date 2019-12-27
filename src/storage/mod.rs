@@ -2,9 +2,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
+pub use volume::Volume;
+
 use crate::error::Result;
 use crate::needle::Needle;
-pub use volume::Volume;
 
 pub mod index;
 pub mod service;
@@ -30,7 +31,12 @@ struct InnerStorage {
 impl InnerStorage {
     // Create a storage instance on the specified directory and network address.
     // Open if there are some volumes located at.
-    pub fn open(dir: &str, ip: &str, port: u16) -> Result<InnerStorage> {
+    pub async fn open(dir: &str, ip: &str, port: u16) -> Result<InnerStorage> {
+        // make sure the directory exists
+        if !Path::new(dir).exists() {
+            std::fs::create_dir_all(dir)?;
+        }
+
         let dir_result = std::fs::read_dir(dir)?;
 
         let index_files = dir_result
@@ -112,20 +118,21 @@ impl InnerStorage {
     }
 }
 
+#[derive(Clone)]
 pub struct Storage {
-    inner: RwLock<InnerStorage>,
+    inner: Arc<RwLock<InnerStorage>>,
 }
 
 impl Storage {
     // Create a storage instance on the specified directory and network address.
     // Open if there are some volumes located at.
-    pub fn open(dir: &str, ip: &str, port: u16) -> Result<Storage> {
-        InnerStorage::open(dir, ip, port).map(|s| Storage {
-            inner: RwLock::new(s),
+    pub async fn open(dir: &str, ip: &str, port: u16) -> Result<Storage> {
+        InnerStorage::open(dir, ip, port).await.map(|s| Storage {
+            inner: Arc::new(RwLock::new(s)),
         })
     }
 
-    pub fn create_volume(
+    pub async fn create_volume(
         &self,
         volume_id: u64,
         replica_replacement: &Option<volume::ReplicaReplacement>,
@@ -168,13 +175,13 @@ impl Storage {
         }
     }
 
-    pub fn read_needle(&self, volume_id: u32, needle_id: u64) -> Result<Needle> {
+    pub fn read_needle(&self, volume_id: u64, needle_id: u64) -> Result<Needle> {
         let storage = self.inner.read().unwrap();
         if volume_id as usize >= storage.volumes.len() {
             // FIXME: index out of range
             return Err(error!("volume not found"));
         }
-        let volume = &storage.volumes[&(volume_id as u64)];
+        let volume = &storage.volumes[&volume_id];
         volume.get(needle_id)
     }
 }

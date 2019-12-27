@@ -1,7 +1,9 @@
-use crate::{Error, Result};
+use std::collections::{HashMap, HashSet};
+
 use rand::seq::IteratorRandom;
 use rand::Rng;
-use std::collections::{HashMap, HashSet};
+
+use crate::{Error, Result};
 
 pub struct Node {
     pub rack_id: u64,

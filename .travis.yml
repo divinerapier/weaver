@@ -1,20 +1,20 @@
 language: rust
 
 rust:
-    - beta
+  - beta
 
 before_install:
-    - rustup toolchain remove stable
-    - rustup toolchain remove beta
-    - rustup default nightly-2019-11-25
-    - rustup component add cargo clippy rustc rustfmt
-    - rustup show
+  - rustup toolchain remove stable
+  - rustup toolchain remove beta
+  - rustup default nightly-2019-11-25
+  - rustup component add cargo clippy rustc rustfmt
+  - rustup show
 
 install:
-    - "true"
+  - "true"
 
 script:
-    - make test
+  - make test
 
 cache:
-    - cargo
+  - cargo

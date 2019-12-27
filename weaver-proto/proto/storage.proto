@@ -5,39 +5,45 @@ package weaver.storage;
 import "weaver.proto";
 
 service Storage {
-  rpc AllocateVolume(AllocateVolumeRequest) returns (AllocateVolumeResponse) {}
-  rpc WriteNeedle(stream WriteNeedleRequest) returns (WriteNeedleResponse) {}
-  rpc ReadNeedle(ReadNeedleRequest) returns (stream ReadNeedleResponse) {}
+    rpc AllocateVolume (AllocateVolumeRequest) returns (AllocateVolumeResponse) {
+    }
+    rpc WriteNeedle (stream WriteNeedleRequest) returns (WriteNeedleResponse) {
+    }
+    rpc ReadNeedle (ReadNeedleRequest) returns (stream ReadNeedleResponse) {
+    }
 }
 
 message AllocateVolumeRequest {
-  uint32 volume_id = 1;
-  uint32 max_volume_size = 2;
-  uint32 max_needle_count = 3;
-  int64 ttl = 4;
-  ReplicaReplacement replica_replacement = 5;
+    uint32 volume_id = 1;
+    uint32 max_volume_size = 2;
+    uint32 max_needle_count = 3;
+    int64 ttl = 4;
+    ReplicaReplacement replica_replacement = 5;
 }
 
-message AllocateVolumeResponse { weaver.Status status = 1; }
+message AllocateVolumeResponse {
+    weaver.Status status = 1;
+}
 
 message WriteNeedleRequest {
-  uint64 volume_id = 1;
-  weaver.NeedleHeader needle_header = 2;
-  bytes content = 3;
+    uint64 volume_id = 1;
+    weaver.NeedleHeader needle_header = 2;
+    bytes content = 3;
 }
 
-message WriteNeedleResponse {}
+message WriteNeedleResponse {
+}
 
 message ReadNeedleRequest {
-  uint64 volume_id = 1;
-  uint64 needle_id = 2;
-  uint64 cookie = 3;
+    uint64 volume_id = 1;
+    uint64 needle_id = 2;
+    uint64 cookie = 3;
 }
 
 message ReadNeedleResponse {
-  uint64 volume_id = 1;
-  uint64 needle_id = 2;
-  uint64 offset = 3;
-  uint64 size = 4;
-  bytes content = 5;
+    uint64 volume_id = 1;
+    uint64 needle_id = 2;
+    uint64 offset = 3;
+    uint64 size = 4;
+    bytes content = 5;
 }

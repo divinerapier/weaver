@@ -1,9 +1,10 @@
-use crate::storage::Storage;
-
 use futures::{Stream, StreamExt};
 use tokio::sync::mpsc;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
+
+use crate::storage::Storage;
+use serde_json::ser::State;
 
 // clone trait required by `fn create_directory`, so inner fields must be arc
 pub struct StorageService {
@@ -11,9 +12,9 @@ pub struct StorageService {
 }
 
 impl StorageService {
-    pub fn new(dir: &str, ip: &str, port: u16) -> StorageService {
+    pub async fn new(dir: &str, ip: &str, port: u16) -> StorageService {
         StorageService {
-            storage: Storage::open(dir, ip, port).unwrap(),
+            storage: Storage::open(dir, ip, port).await.unwrap(),
         }
     }
 }
@@ -31,12 +32,14 @@ impl weaver_proto::storage::storage_server::Storage for StorageService {
             .replica_replacement
             .map(|rr| super::volume::ReplicaReplacement::from(rr));
 
-        self.storage.create_volume(
-            request.volume_id as u64,
-            &replica_replacement,
-            request.max_volume_size,
-            request.max_needle_count,
-        )?;
+        self.storage
+            .create_volume(
+                request.volume_id as u64,
+                &replica_replacement,
+                request.max_volume_size,
+                request.max_needle_count,
+            )
+            .await?;
 
         Ok(tonic::Response::new(
             weaver_proto::storage::AllocateVolumeResponse { status: None },
@@ -135,8 +138,46 @@ impl weaver_proto::storage::storage_server::Storage for StorageService {
         tokio::sync::mpsc::Receiver<Result<weaver_proto::storage::ReadNeedleResponse, Status>>;
     async fn read_needle(
         &self,
-        _request: tonic::Request<weaver_proto::storage::ReadNeedleRequest>,
+        request: tonic::Request<weaver_proto::storage::ReadNeedleRequest>,
     ) -> Result<tonic::Response<Self::ReadNeedleStream>, tonic::Status> {
-        Err(tonic::Status::unimplemented("Not yet implemented"))
+        let request: weaver_proto::storage::ReadNeedleRequest = request.into_inner();
+        let volume_id = request.volume_id;
+        let needle_id = request.needle_id;
+
+        let storage = self.storage.clone();
+
+        let needle = async move { storage.read_needle(volume_id, needle_id) }.await?;
+
+        let (mut tx, rx) = tokio::sync::mpsc::channel(1);
+
+        tokio::spawn(async move {
+            let mut iter = needle.body.into_iter();
+            let mut offset = 0;
+            while let Some(body) = iter.next() {
+                let res = match body {
+                    Ok(body) => {
+                        let body: bytes::Bytes = body;
+                        let body: Vec<u8> = body.to_vec();
+                        let body_length = body.len() as u64;
+                        let r = tx.send(Ok(weaver_proto::storage::ReadNeedleResponse {
+                            volume_id,
+                            needle_id,
+                            offset,
+                            size: body_length,
+                            content: body,
+                        }));
+                        offset += body_length;
+                        r
+                    }
+                    Err(err) => tx.send(Err(Status::from(err))),
+                }
+                .await;
+                if let Err(e) = res {
+                    log::error!("failed to send needle body. {}", e);
+                }
+            }
+        });
+
+        Ok(tonic::Response::new(rx))
     }
 }

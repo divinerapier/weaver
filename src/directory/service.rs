@@ -1,5 +1,3 @@
-use weaver_proto::directory::*;
-
 use std::collections::HashMap;
 use std::path::Path;
 use std::pin::Pin;
@@ -11,6 +9,8 @@ use std::sync::{
 use futures::future::FutureExt;
 use futures::Stream;
 use tonic::{Request, Response, Status};
+
+use weaver_proto::directory::*;
 
 pub struct DirectoryService<S>
 where

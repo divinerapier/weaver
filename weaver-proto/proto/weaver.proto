@@ -3,20 +3,20 @@ syntax = "proto3";
 package weaver;
 
 enum FileMode {
-  UnknownFileMode = 0;
-  Directory = 1;
-  RegularFile = 2;
+    UnknownFileMode = 0;
+    Directory = 1;
+    RegularFile = 2;
 }
 
 enum Code {
-  UnknownCode = 0;
-  Ok = 1;
-  Failed = 2;
+    UnknownCode = 0;
+    Ok = 1;
+    Failed = 2;
 }
 
 message Status {
-  Code code = 1;
-  string message = 2;
+    Code code = 1;
+    string message = 2;
 }
 
 // Needle is the unit of a volume. Align to 8 bytes.
@@ -26,147 +26,151 @@ message Status {
 // 02 | body            | padding = 8 - body_length % 8 |
 //
 message Needle {
-  // let hl = headler_length;
-  // let bl = body_length;
-  //
-  // fn pad(i: u32) -> u32 {
-  //   match i & 7 {
-  //     0 => i,
-  //     d @ _ => i + 8 - d,
-  //   }
-  // }
-  //
-  // let header_padded = pad(header_length);
-  // let body_padded = pad(body_length);
-  // let data = read(reader, header_padded + body_padded);
-  // let header = &data[0..header_length];
-  // let body = &data[header_padded..header_padded+body_length];
-  NeedleHeader header = 3;
-  bytes body = 4;
+    // let hl = headler_length;
+    // let bl = body_length;
+    //
+    // fn pad(i: u32) -> u32 {
+    //   match i & 7 {
+    //     0 => i,
+    //     d @ _ => i + 8 - d,
+    //   }
+    // }
+    //
+    // let header_padded = pad(header_length);
+    // let body_padded = pad(body_length);
+    // let data = read(reader, header_padded + body_padded);
+    // let header = &data[0..header_length];
+    // let body = &data[header_padded..header_padded+body_length];
+    NeedleHeader header = 3;
+    bytes body = 4;
 }
 
 message NeedleHeader {
-  uint64 id = 1;
-  uint64 cookie = 2;
-  uint64 offset = 3;
-  uint32 size = 4;
-  uint64 total_size = 5;
-  uint32 crc = 6;
+    uint64 id = 1;
+    uint64 cookie = 2;
+    uint64 offset = 3;
+    uint32 size = 4;
+    uint64 total_size = 5;
+    uint32 crc = 6;
 }
 
 message ReplicaReplacement {
-  uint32 data_center_count = 1;
-  // in same data center
-  uint32 rack_count = 2;
-  // in same rack
-  uint32 node_count = 3;
+    uint32 data_center_count = 1;
+    // in same data center
+    uint32 rack_count = 2;
+    // in same rack
+    uint32 node_count = 3;
 }
 
 message Attribute {
-  uint64 size = 1;
-  int64 crtime = 3; // unix time in seconds
-  string mime = 4;
-  FileMode mode = 5;
-  uint32 uid = 6;
-  uint32 gid = 7;
-  ReplicaReplacement replica_replacement = 8;
-  int32 ttl_sec = 9;
+    uint64 size = 1;
+    int64 crtime = 3; // unix time in seconds
+    string mime = 4;
+    FileMode mode = 5;
+    uint32 uid = 6;
+    uint32 gid = 7;
+    ReplicaReplacement replica_replacement = 8;
+    int32 ttl_sec = 9;
 }
 
 // Chunk refers to a needle.
 message Chunk {
-  uint32 volume_id = 1;
-  uint64 needle_id = 2;
-  uint64 cookie = 3;
-  int64 offset = 4;
-  uint64 size = 5;
-  string etag = 6;
+    uint32 volume_id = 1;
+    uint64 needle_id = 2;
+    uint64 cookie = 3;
+    int64 offset = 4;
+    uint64 size = 5;
+    string etag = 6;
 }
 
 // Entry indicates an object info, includes name, chunks and attibute,
 // used by directory.
 message Entry {
-  string key = 1;
-  Attribute attribute = 2;
-  repeated Chunk chunks = 3;
+    string key = 1;
+    Attribute attribute = 2;
+    repeated Chunk chunks = 3;
 }
 
 message FullEntry {
-  string dir = 1;
-  Entry entry = 2;
+    string dir = 1;
+    Entry entry = 2;
 }
 
-message Locations { repeated Location locations = 1; }
+message Locations {
+    repeated Location locations = 1;
+}
 
 message Location {
-  string url = 1;
-  string presigned_url = 2;
+    string url = 1;
+    string presigned_url = 2;
 }
 
 // Node is a machine.
 message Node {
-  uint64 id = 1;
-  uint64 volume_count = 2;
-  uint64 max_volume_count = 3;
-  uint64 free_volume_count = 4;
-  uint64 active_volume_count = 5;
-  repeated VolumeInformationMessage volume_infos = 6;
+    uint64 id = 1;
+    uint64 volume_count = 2;
+    uint64 max_volume_count = 3;
+    uint64 free_volume_count = 4;
+    uint64 active_volume_count = 5;
+    repeated VolumeInformationMessage volume_infos = 6;
 }
 
 // Rack consists of many nodes.
 message Rack {
-  uint64 id = 1;
-  uint64 volume_count = 2;
-  uint64 max_volume_count = 3;
-  uint64 free_volume_count = 4;
-  uint64 active_volume_count = 5;
-  repeated Node nodes = 6;
+    uint64 id = 1;
+    uint64 volume_count = 2;
+    uint64 max_volume_count = 3;
+    uint64 free_volume_count = 4;
+    uint64 active_volume_count = 5;
+    repeated Node nodes = 6;
 }
 
 // DataCenter consists of many racks.
 message DataCenter {
-  uint64 id = 1;
-  uint64 volume_count = 2;
-  uint64 max_volume_count = 3;
-  uint64 free_volume_count = 4;
-  uint64 active_volume_count = 5;
-  repeated Rack racks = 6;
+    uint64 id = 1;
+    uint64 volume_count = 2;
+    uint64 max_volume_count = 3;
+    uint64 free_volume_count = 4;
+    uint64 active_volume_count = 5;
+    repeated Rack racks = 6;
 }
 
 message VolumeInformationMessage {
-  uint32 id = 1;
-  uint64 size = 2;
-  string bucket = 3;
-  uint64 file_count = 4;
-  uint64 delete_count = 5;
-  uint64 deleted_byte_count = 6;
-  bool read_only = 7;
-  ReplicaReplacement replica_replacement = 8;
-  uint32 version = 9;
-  uint32 ttl = 10;
-  uint32 compact_revision = 11;
-  int64 modified_at_second = 12;
+    uint32 id = 1;
+    uint64 size = 2;
+    string bucket = 3;
+    uint64 file_count = 4;
+    uint64 delete_count = 5;
+    uint64 deleted_byte_count = 6;
+    bool read_only = 7;
+    ReplicaReplacement replica_replacement = 8;
+    uint32 version = 9;
+    uint32 ttl = 10;
+    uint32 compact_revision = 11;
+    int64 modified_at_second = 12;
 }
 
 message VolumeShortInformationMessage {
-  uint32 id = 1;
-  string bucket = 2;
-  ReplicaReplacement replica_replacement = 3;
-  uint32 version = 4;
-  uint32 ttl = 5;
+    uint32 id = 1;
+    string bucket = 2;
+    ReplicaReplacement replica_replacement = 3;
+    uint32 version = 4;
+    uint32 ttl = 5;
 }
 
 message SuperBlockExtra {
-  message ErasureCoding {
-    uint32 data = 1;
-    uint32 parity = 2;
-    repeated uint32 volume_ids = 3;
-  }
-  ErasureCoding erasure_coding = 1;
+    message ErasureCoding {
+        uint32 data = 1;
+        uint32 parity = 2;
+        repeated uint32 volume_ids = 3;
+    }
+    ErasureCoding erasure_coding = 1;
 }
 
 message StorageType {
-  ReplicaReplacement replica_replacement = 1;
-  string ttl = 2;
+    ReplicaReplacement replica_replacement = 1;
+    string ttl = 2;
 }
-message Bucket { string name = 1; }
+message Bucket {
+    string name = 1;
+}

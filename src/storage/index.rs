@@ -1,12 +1,12 @@
-#[allow(dead_code)]
-use crate::error::Result;
-
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use byteorder::ByteOrder;
+
+#[allow(dead_code)]
+use crate::error::Result;
 
 pub trait Codec: Send + Sync {
     fn encode(&self, entry: &Entry) -> Result<Vec<u8>>;

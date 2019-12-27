@@ -1,3 +1,5 @@
+pub use error::{Error, Result};
+
 #[macro_use]
 pub mod macros;
 
@@ -8,4 +10,3 @@ pub mod needle;
 pub mod node;
 pub mod storage;
 pub mod utils;
-pub use error::{Error, Result};

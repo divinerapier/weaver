@@ -1,5 +1,3 @@
-use crate::Result;
-
 use std::collections::HashMap;
 use std::marker::{Send, Sync};
 use std::ops::{Index, IndexMut};
@@ -8,9 +6,10 @@ use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
 use futures::{Stream, StreamExt};
-
 use rose_tree::petgraph::graph::{DefaultIx, NodeIndex};
 use rose_tree::RoseTree;
+
+use crate::Result;
 
 pub type Chunk = weaver_proto::weaver::Chunk;
 pub type Entry = weaver_proto::weaver::Entry;
