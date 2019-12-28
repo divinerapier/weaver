@@ -1,21 +1,21 @@
 [package]
-name = "weaver-directory"
+name = "master"
 version = "0.1.0"
 authors = ["divinerapier <poriter.coco@gmail.com>"]
 edition = "2018"
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # local
-weaver-proto = {path = "../weaver-proto", version = "0.1.0"}
-weaver = {path = "../", version = "0.1.0"}
+proto = {path = "../../proto", version = "0.1.0"}
+weaver = {path = "../../", version = "0.1.0"}
 
 # transport and protocol
 tonic = { version = "0.1.0-beta.1", features = ["tls"] }
 bytes = "0.4"
 prost = "0.5"
-
 tokio = { version = "0.2", features = ["rt-threaded", "time", "stream", "fs", "macros", "uds"] }
 futures = { version = "0.3", default-features = false, features = ["alloc"]}
 async-stream = "0.2"
@@ -25,5 +25,3 @@ tower = "0.3"
 # logger
 env_logger = "0.6.2"
 log = "0.4.8"
-
-

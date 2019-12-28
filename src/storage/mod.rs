@@ -163,11 +163,7 @@ impl Storage {
         Ok(())
     }
 
-    pub async fn write_needle(
-        &self,
-        volume_id: u64,
-        needle: &weaver_proto::weaver::Needle,
-    ) -> Result<()> {
+    pub async fn write_needle(&self, volume_id: u64, needle: &proto::weaver::Needle) -> Result<()> {
         let mut storage = self.inner.write().unwrap();
         match storage.volumes.get_mut(&volume_id) {
             Some(volume) => Ok(volume.write_needle2(needle)?),

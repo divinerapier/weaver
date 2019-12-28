@@ -60,8 +60,8 @@ impl ReplicaReplacement {
     }
 }
 
-impl From<weaver_proto::weaver::ReplicaReplacement> for ReplicaReplacement {
-    fn from(rr: weaver_proto::weaver::ReplicaReplacement) -> Self {
+impl From<proto::weaver::ReplicaReplacement> for ReplicaReplacement {
+    fn from(rr: proto::weaver::ReplicaReplacement) -> Self {
         ReplicaReplacement {
             data_center_count: (rr.data_center_count & 0xff) as u8,
             rack_count: (rr.rack_count & 0xff) as u8,
@@ -421,7 +421,7 @@ where
         Ok(())
     }
 
-    pub fn write_needle2(&mut self, needle: &weaver_proto::weaver::Needle) -> Result<()> {
+    pub fn write_needle2(&mut self, needle: &proto::weaver::Needle) -> Result<()> {
         if needle.header.is_none() {
             return Err(error!("failed to write empty needle"));
         }
@@ -430,7 +430,7 @@ where
         Ok(())
     }
 
-    fn _write_needle(&mut self, needle: &weaver_proto::weaver::Needle) -> Result<()> {
+    fn _write_needle(&mut self, needle: &proto::weaver::Needle) -> Result<()> {
         let header = needle.header.as_ref().unwrap();
         let body: &[u8] = &needle.body;
 
@@ -455,7 +455,7 @@ where
         }
     }
 
-    fn _write_index(&mut self, needle: &weaver_proto::weaver::Needle) -> Result<()> {
+    fn _write_index(&mut self, needle: &proto::weaver::Needle) -> Result<()> {
         let needle = needle.header.as_ref().unwrap();
         let index = IndexEntry::new(
             needle.id,

@@ -4,13 +4,13 @@ build-library: build-proto
 	cargo build
 
 build-storage: build-library
-	cargo build --package weaver-storage
+	cargo build --package storage
 	
 build-master: build-library
-	cargo build --package weaver-master
+	cargo build --package master
 
 build-directory: build-library
-	cargo build --package weaver-directory
+	cargo build --package directory
 
 release: build-storage build-master build-directory
 
@@ -19,22 +19,22 @@ release-library: release-proto
 	cargo build --release
 
 release-storage: release-library
-	cargo build --release --package weaver-storage
+	cargo build --release --package storage
 	
 release-master: release-library
-	cargo build --release --package weaver-master
+	cargo build --release --package master
 
 release-directory: release-library
-	cargo build --release --package weaver-directory
+	cargo build --release --package directory
 
 test: build-library
 	RUST_BACKTRACE=full cargo test -- --nocapture
 	
 build-proto: format
-	cargo build --package weaver-proto
+	cargo build --package proto
 
 release-proto: format
-	cargo build --release --package weaver-proto
+	cargo build --release --package proto
 
 format:
 	cargo fmt

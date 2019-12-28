@@ -10,7 +10,7 @@ use futures::future::FutureExt;
 use futures::Stream;
 use tonic::{Request, Response, Status};
 
-use weaver_proto::directory::*;
+use proto::directory::*;
 
 pub struct DirectoryService<S>
 where
@@ -41,7 +41,7 @@ where
         request: Request<LookupEntryRequest>,
     ) -> Result<Response<LookupEntryResponse>, Status> {
         use super::Chunk;
-        use weaver_proto::weaver::Entry;
+        use proto::weaver::Entry;
         let request: LookupEntryRequest = request.into_inner();
         let key: String = request.key;
         Ok(Response::new(LookupEntryResponse {
@@ -118,8 +118,8 @@ where
     }
     async fn statistics(
         &self,
-        _request: tonic::Request<weaver_proto::directory::StatisticsRequest>,
-    ) -> Result<tonic::Response<weaver_proto::directory::StatisticsResponse>, tonic::Status> {
+        _request: tonic::Request<proto::directory::StatisticsRequest>,
+    ) -> Result<tonic::Response<proto::directory::StatisticsResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
 }

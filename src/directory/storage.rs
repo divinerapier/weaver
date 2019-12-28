@@ -11,8 +11,8 @@ use rose_tree::RoseTree;
 
 use crate::Result;
 
-pub type Chunk = weaver_proto::weaver::Chunk;
-pub type Entry = weaver_proto::weaver::Entry;
+pub type Chunk = proto::weaver::Chunk;
+pub type Entry = proto::weaver::Entry;
 
 #[tonic::async_trait]
 pub trait DirectoryStorage: Send + Sync {
