@@ -24,12 +24,10 @@ pub enum VolumeExtension {
 
 impl From<&str> for VolumeExtension {
     fn from(t: &str) -> VolumeExtension {
-        if t == "index" {
-            VolumeExtension::Index
-        } else if t == "data" {
-            VolumeExtension::Data
-        } else {
-            VolumeExtension::Unknown
+        match t {
+            "index" | "idx" => VolumeExtension::Index,
+            "data" | "dat" => VolumeExtension::Data,
+            _ => VolumeExtension::Unknown
         }
     }
 }
@@ -89,9 +87,9 @@ pub struct Volume<C: super::index::Codec> {
     pub index: Index<C>,
 }
 
-unsafe impl<C: super::index::Codec> Send for Volume<C> {}
-
-unsafe impl<C: super::index::Codec> Sync for Volume<C> {}
+// unsafe impl<C: super::index::Codec> Send for Volume<C> {}
+//
+// unsafe impl<C: super::index::Codec> Sync for Volume<C> {}
 
 pub struct VolumeAttibute {
     pub id: AtomicU64,
@@ -192,21 +190,58 @@ impl From<&[u8]> for SuperBlock {
     }
 }
 
+// 18009840492
+pub struct VolumeBuilder<P, C> where P: AsRef<Path>, C: IndexCodec {
+    dir: Option<P>,
+    size: Option<u64>,
+    super_block: Option<SuperBlock>,
+    codec: Option<C>,
+}
+
+
+impl<P, C> VolumeBuilder<P, C> where P: AsRef<Path>, C: IndexCodec {
+    pub fn new() -> VolumeBuilder<P, C> {
+        VolumeBuilder {
+            dir: None,
+            size: None,
+            super_block: None,
+            codec: None,
+        }
+    }
+
+    pub fn set_dir(mut self, dir: P) -> VolumeBuilder<P, C> {
+        self.dir = Some(dir);
+        self
+    }
+    pub fn set_size(mut self, size: u64) -> VolumeBuilder<P, C> {
+        self.size = Some(size);
+        self
+    }
+    pub fn set_super_block(mut self, super_block: SuperBlock) -> VolumeBuilder<P, C> {
+        self.super_block = Some(super_block);
+        self
+    }
+    pub fn set_codec(mut self, codec: C) -> VolumeBuilder<P, C> {
+        self.codec = Some(codec);
+        self
+    }
+}
+
 impl<C> Volume<C>
-where
-    C: IndexCodec,
+    where
+        C: IndexCodec,
 {
     /// Create a new volume on the specified directory with the id as its name.
     /// And set the size and replica replacement of the volume.
-    pub fn new<P: AsRef<Path>>(
+    pub async fn new<P: AsRef<Path>>(
         dir: P,
         id: u64,
         size: u64,
         super_block: &SuperBlock,
         codec: C,
     ) -> Result<Volume<C>>
-    where
-        C: super::index::Codec,
+        where
+            C: super::index::Codec,
     {
         let volume_path: PathBuf = dir.as_ref().join(format!("{}.data", id));
         let index_path: PathBuf = dir.as_ref().join(format!("{}.index", id));
@@ -245,7 +280,7 @@ where
     }
 
     // Open the exist file.
-    pub fn open<P: AsRef<Path>>(dir: P, id: u64, size: u64, codec: C) -> Result<Volume<C>> {
+    pub async fn open<P: AsRef<Path>>(dir: P, id: u64, size: u64, codec: C) -> Result<Volume<C>> {
         // filename should be usize
         let volume_path = dir.as_ref().join(format!("{}.data", id));
         let index_path = dir.as_ref().join(format!("{}.index", id));

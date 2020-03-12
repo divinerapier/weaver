@@ -142,7 +142,7 @@ impl storage_server::Storage for StorageService {
         let volume_id = request.volume_id;
         let needle_id = request.needle_id;
         let storage = self.storage.clone();
-        let needle = async move { storage.read_needle(volume_id, needle_id) }.await?;
+        let needle = storage.read_needle(volume_id, needle_id).await?;
         let (mut tx, rx) = tokio::sync::mpsc::channel(1);
 
         tokio::spawn(async move {

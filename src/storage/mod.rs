@@ -1,11 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+// use std::sync::{Arc, RwLock};
 
+use async_std::sync::{Arc, RwLock};
 pub use volume::Volume;
 
 use crate::error::Result;
 use crate::needle::Needle;
+use crate::storage::volume::VolumeExtension;
 
 pub mod index;
 pub mod service;
@@ -37,9 +39,9 @@ impl InnerStorage {
             std::fs::create_dir_all(dir)?;
         }
 
-        let dir_result = std::fs::read_dir(dir)?;
+        let filelist = std::fs::read_dir(dir)?;
 
-        let index_files = dir_result
+        let index_files = filelist
             .filter_map(|entry| {
                 let entry: std::fs::DirEntry = entry.ok()?;
                 let metadata = entry.metadata().ok()?;
@@ -55,18 +57,20 @@ impl InnerStorage {
                 }
             })
             .filter_map(|(entry, _)| {
-                if let Some(extension) = PathBuf::from(entry.file_name()).extension() {
-                    if extension == "index" {
+                match VolumeExtension::from(PathBuf::from(entry.file_name()).extension().unwrap()) {
+                    VolumeExtension::Index => {
                         // file_name, eg: 1.index
                         // index_files.push(entry.file_name());
                         Some(entry.file_name())
-                    } else {
+                    }
+                    VolumeExtension::Data => {
                         log::warn!("open store. skip entry: {:?}", entry);
                         None
                     }
-                } else {
-                    log::error!("open store. skip entry: {:?}", entry);
-                    None
+                    VolumeExtension::Unknown => {
+                        log::warn!("open store. skip entry: {:?}", entry);
+                        None
+                    }
                 }
             })
             .collect::<Vec<std::ffi::OsString>>();
@@ -83,8 +87,10 @@ impl InnerStorage {
                 Some((index as u64, index_file_name))
             })
             .map(|(idx, _index_file_name)| {
-                let volume_result = Volume::open(dir, idx, 128, index::JSONCodec);
-                (idx, volume_result)
+                async_std::task::block_on(async move {
+                    let volume_result = Volume::open(dir, idx, 128, index::JSONCodec).await;
+                    (idx, volume_result)
+                })
             })
             .filter(|(_, volume_result)| volume_result.is_ok())
             .map(|(index, volume_result)| (index, volume_result.unwrap()))
@@ -139,7 +145,7 @@ impl Storage {
         max_volume_size: u32,
         max_needle_count: u32,
     ) -> Result<()> {
-        let mut storage = self.inner.write().unwrap();
+        let mut storage = self.inner.write().await;
         if storage.volumes.contains_key(&volume_id) {
             return Err(error!("failed to create an exists volume {}", volume_id));
         }
@@ -151,7 +157,7 @@ impl Storage {
             max_volume_size as u64,
             &super_block,
             index::JSONCodec,
-        )?;
+        ).await?;
 
         if volume.writable() {
             storage.writable_volumes.insert(volume_id);
@@ -164,15 +170,15 @@ impl Storage {
     }
 
     pub async fn write_needle(&self, volume_id: u64, needle: &proto::weaver::Needle) -> Result<()> {
-        let mut storage = self.inner.write().unwrap();
+        let mut storage = self.inner.write().await;
         match storage.volumes.get_mut(&volume_id) {
             Some(volume) => Ok(volume.write_needle2(needle)?),
             None => Err(storage_error!("volume not found: {}", volume_id)),
         }
     }
 
-    pub fn read_needle(&self, volume_id: u64, needle_id: u64) -> Result<Needle> {
-        let storage = self.inner.read().unwrap();
+    pub async fn read_needle(&self, volume_id: u64, needle_id: u64) -> Result<Needle> {
+        let storage = self.inner.read().await;
         if volume_id as usize >= storage.volumes.len() {
             // FIXME: index out of range
             return Err(error!("volume not found"));

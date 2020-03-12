@@ -46,3 +46,6 @@ log = "0.4.8"
 
 # date and time
 chrono = { version = "0.4", features = ["serde"] }
+
+# async std
+async-std = {version = "*", features = ["std"]}
