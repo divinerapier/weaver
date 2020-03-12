@@ -94,32 +94,10 @@ where
     }
     async fn delete_entry(
         &self,
-        _request: Request<DeleteEntryRequest>,
+        request: Request<DeleteEntryRequest>,
     ) -> Result<Response<DeleteEntryResponse>, Status> {
-        Err(tonic::Status::unimplemented("Not yet implemented"))
-    }
-    async fn assign_volume(
-        &self,
-        _request: Request<AssignVolumeRequest>,
-    ) -> Result<Response<AssignVolumeResponse>, Status> {
-        Err(tonic::Status::unimplemented("Not yet implemented"))
-    }
-    async fn lookup_volume(
-        &self,
-        _request: Request<LookupVolumeRequest>,
-    ) -> Result<Response<LookupVolumeResponse>, Status> {
-        Err(tonic::Status::unimplemented("Not yet implemented"))
-    }
-    async fn delete_collection(
-        &self,
-        _request: Request<DeleteCollectionRequest>,
-    ) -> Result<Response<DeleteCollectionResponse>, Status> {
-        Err(tonic::Status::unimplemented("Not yet implemented"))
-    }
-    async fn statistics(
-        &self,
-        _request: tonic::Request<proto::directory::StatisticsRequest>,
-    ) -> Result<tonic::Response<proto::directory::StatisticsResponse>, tonic::Status> {
+        let request: DeleteEntryRequest = request.into_inner();
+
         Err(tonic::Status::unimplemented("Not yet implemented"))
     }
 }

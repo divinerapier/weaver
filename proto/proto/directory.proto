@@ -6,10 +6,11 @@ import "weaver.proto";
 
 service Directory {
 
-    //
+    // find the entry for the giving key
     rpc LookupEntry (LookupEntryRequest) returns (LookupEntryResponse) {
     }
 
+    // list children entries for the giving key
     rpc ListEntries (ListEntriesRequest) returns (stream ListEntriesResponse) {
     }
 
@@ -22,17 +23,17 @@ service Directory {
     rpc DeleteEntry (DeleteEntryRequest) returns (DeleteEntryResponse) {
     }
 
-    rpc AssignVolume (AssignVolumeRequest) returns (AssignVolumeResponse) {
-    }
+//    rpc AssignVolume (AssignVolumeRequest) returns (AssignVolumeResponse) {
+//    }
 
-    rpc LookupVolume (LookupVolumeRequest) returns (LookupVolumeResponse) {
-    }
+//    rpc LookupVolume (LookupVolumeRequest) returns (LookupVolumeResponse) {
+//    }
 
-    rpc DeleteCollection (DeleteCollectionRequest) returns (DeleteCollectionResponse) {
-    }
+//    rpc DeleteCollection (DeleteCollectionRequest) returns (DeleteCollectionResponse) {
+//    }
 
-    rpc Statistics (StatisticsRequest) returns (StatisticsResponse) {
-    }
+//    rpc Statistics (StatisticsRequest) returns (StatisticsResponse) {
+//    }
 }
 
 // LookupEntryRequest is the type of message used to look up an entry
@@ -53,7 +54,6 @@ message ListEntriesRequest {
 }
 
 message ListEntriesResponse {
-    //   repeated weaver.Entry entries = 1;
     string entry = 1;
 }
 
@@ -74,69 +74,67 @@ message UpdateEntryResponse {
 }
 
 message DeleteEntryRequest {
-    string directory = 1;
+    string key = 1;
     string name = 2;
-    // bool is_directory = 3;
-    bool is_delete_data = 4;
-    bool is_recursive = 5;
-    bool ignore_recursive_error = 6;
+    bool is_recursive = 3;
+    bool ignore_recursive_error = 4;
 }
 
 message DeleteEntryResponse {
 }
 
-message AtomicRenameEntryRequest {
-    string old_directory = 1;
-    string old_name = 2;
-    string new_directory = 3;
-    string new_name = 4;
-}
+//message AtomicRenameEntryRequest {
+//    string old_directory = 1;
+//    string old_name = 2;
+//    string new_directory = 3;
+//    string new_name = 4;
+//}
+//
+//message AtomicRenameEntryResponse {
+//}
+//
+//message AssignVolumeRequest {
+//    int32 count = 1;
+//    string collection = 2;
+//    ReplicaReplacement replica_replacement = 3;
+//    int32 ttl_sec = 4;
+//    string data_center = 5;
+//}
+//
+//message AssignVolumeResponse {
+//    string file_id = 1;
+//    string url = 2;
+//    string presigned_url = 3;
+//    int32 count = 4;
+//    string auth = 5;
+//}
 
-message AtomicRenameEntryResponse {
-}
+//message LookupVolumeRequest {
+//    repeated string volume_ids = 1;
+//}
+//
+//message LookupVolumeResponse {
+//    map<string, Locations> locations_map = 1;
+//}
 
-message AssignVolumeRequest {
-    int32 count = 1;
-    string collection = 2;
-    ReplicaReplacement replica_replacement = 3;
-    int32 ttl_sec = 4;
-    string data_center = 5;
-}
+//message DeleteCollectionRequest {
+//    string collection = 1;
+//}
+//
+//message DeleteCollectionResponse {
+//}
 
-message AssignVolumeResponse {
-    string file_id = 1;
-    string url = 2;
-    string presigned_url = 3;
-    int32 count = 4;
-    string auth = 5;
-}
-
-message LookupVolumeRequest {
-    repeated string volume_ids = 1;
-}
-
-message LookupVolumeResponse {
-    map<string, Locations> locations_map = 1;
-}
-
-message DeleteCollectionRequest {
-    string collection = 1;
-}
-
-message DeleteCollectionResponse {
-}
-
-message StatisticsRequest {
-    ReplicaReplacement replica_replacement = 1;
-    string collection = 2;
-    string ttl = 3;
-}
-
-message StatisticsResponse {
-    ReplicaReplacement replica_replacement = 1;
-    string collection = 2;
-    string ttl = 3;
-    uint64 total_size = 4;
-    uint64 used_size = 5;
-    uint64 file_count = 6;
-}
+//message StatisticsRequest {
+//    ReplicaReplacement replica_replacement = 1;
+//    string collection = 2;
+//    string ttl = 3;
+//}
+//
+//message StatisticsResponse {
+//    ReplicaReplacement replica_replacement = 1;
+//    string collection = 2;
+//    string ttl = 3;
+//    uint64 total_size = 4;
+//    uint64 used_size = 5;
+//    uint64 file_count = 6;
+//}

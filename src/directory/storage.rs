@@ -3,7 +3,8 @@ use std::marker::{Send, Sync};
 use std::ops::{Index, IndexMut};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::sync::{Arc, RwLock};
+
+use async_std::sync::{Arc, RwLock};
 
 use futures::{Stream, StreamExt};
 use rose_tree::petgraph::graph::{DefaultIx, NodeIndex};
@@ -27,7 +28,12 @@ pub trait DirectoryStorage: Send + Sync {
     ///
     async fn retrieve(&self, key: &str) -> Result<Option<Vec<Chunk>>>;
 
-    async fn delete(&mut self, key: &str) -> Result<()>;
+    async fn delete(
+        &mut self,
+        key: &str,
+        recursive: bool,
+        ignore_recursive_error: bool,
+    ) -> Result<()>;
 
     async fn list<'a>(
         &'a self,
@@ -107,9 +113,11 @@ impl DirectoryStorage for MemoryDirectoryStorage {
             .enumerate()
             .filter(move |(i, _)| *i < limit as usize)
             .map(move |(_, index)| {
-                let index2entry = index2entry.read().unwrap();
-                let entry: &str = index2entry.index(&index);
-                entry.to_owned()
+                async_std::task::block_on(async {
+                    let index2entry = index2entry.read().await;
+                    let entry: &str = index2entry.index(&index);
+                    entry.to_owned()
+                })
             });
         let children = Box::new(children) as Box<dyn Iterator<Item = String>>;
 
@@ -132,7 +140,7 @@ impl DirectoryStorage for MemoryDirectoryStorage {
         let child_index = self.tree.add_child(parent_index, Some(chunks));
         self.entries.insert(key.to_owned(), child_index);
         {
-            let mut index2entry = self.index2entry.write().unwrap();
+            let mut index2entry = self.index2entry.write().await;
             index2entry.insert(child_index, key.to_owned());
         }
         Ok(())
@@ -159,13 +167,18 @@ impl DirectoryStorage for MemoryDirectoryStorage {
         }
     }
 
-    async fn delete(&mut self, key: &str) -> Result<()> {
+    async fn delete(
+        &mut self,
+        key: &str,
+        recursive: bool,
+        ignore_recursive_error: bool,
+    ) -> Result<()> {
         match self.entries.get(key) {
             Some(&index) => {
                 self.tree.remove_node(index);
                 self.entries.remove(key);
                 {
-                    let mut index2entry = self.index2entry.write().unwrap();
+                    let mut index2entry = self.index2entry.write().await;
                     index2entry.remove(&index);
                 }
                 Ok(())
