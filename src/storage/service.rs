@@ -6,24 +6,25 @@ use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 
 use proto::storage::*;
+use super::index::Codec;
 
-use crate::storage::Storage;
+use super::storage::Storage;
 
 // clone trait required by `fn create_directory`, so inner fields must be arc
-pub struct StorageService {
-    storage: Storage,
+pub struct StorageService<C> where C: Codec {
+    storage: Storage<C>,
 }
 
-impl StorageService {
-    pub async fn new(dir: &str, ip: &str, port: u16) -> StorageService {
+impl<C> StorageService<C> where C: Codec + Send + Sync + 'static {
+    pub async fn new(dir: &str, ip: &str, port: u16, codec: C) -> StorageService<C> {
         StorageService {
-            storage: Storage::open(dir, ip, port).await.unwrap(),
+            storage: Storage::open(dir, ip, port, codec).await.unwrap(),
         }
     }
 }
 
 #[tonic::async_trait]
-impl storage_server::Storage for StorageService {
+impl<C> storage_server::Storage for StorageService<C> where C: Codec + Send + Sync + 'static {
     /// Create a new volume with the specified replica replacement.
     async fn allocate_volume(
         &self,
@@ -56,8 +57,8 @@ impl storage_server::Storage for StorageService {
         futures::pin_mut!(stream);
 
         fn check_and_set<T>(old: &mut Option<T>, new: &Option<T>) -> crate::error::Result<()>
-        where
-            T: Eq + PartialEq + Clone + std::fmt::Debug,
+            where
+                T: Eq + PartialEq + Clone + std::fmt::Debug,
         {
             if new.is_none() {
                 return Err(crate::error!("invalid volume id or needle id"));
@@ -141,8 +142,8 @@ impl storage_server::Storage for StorageService {
         let request: ReadNeedleRequest = request.into_inner();
         let volume_id = request.volume_id;
         let needle_id = request.needle_id;
-        let storage = self.storage.clone();
-        let needle = storage.read_needle(volume_id, needle_id).await?;
+        // let storage = self.storage.clone();
+        let needle = self.storage.read_needle(volume_id, needle_id).await?;
         let (mut tx, rx) = tokio::sync::mpsc::channel(1);
 
         tokio::spawn(async move {
@@ -166,7 +167,7 @@ impl storage_server::Storage for StorageService {
                     }
                     Err(err) => tx.send(Err(Status::from(err))),
                 }
-                .await;
+                    .await;
                 if let Err(e) = res {
                     log::error!("failed to send needle body. {}", e);
                 }

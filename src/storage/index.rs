@@ -8,11 +8,12 @@ use byteorder::ByteOrder;
 #[allow(dead_code)]
 use crate::error::Result;
 
-pub trait Codec: Send + Sync {
+pub trait Codec: Clone + Send + Sync {
     fn encode(&self, entry: &Entry) -> Result<Vec<u8>>;
     fn decode(&self, data: &[u8]) -> Result<Entry>;
 }
 
+#[derive(Clone)]
 pub struct JSONCodec;
 
 impl Codec for JSONCodec {
@@ -24,6 +25,7 @@ impl Codec for JSONCodec {
     }
 }
 
+#[derive(Clone)]
 pub struct BinaryCodec;
 
 impl Codec for BinaryCodec {
@@ -66,8 +68,8 @@ impl<C: Codec> Index<C> {
         let indexes_reader = serde_json::Deserializer::from_reader(reader).into_iter::<Entry>();
         for index_result in indexes_reader {
             let entry = index_result?;
-            indexes.insert(entry.needle_id, entry);
             last_needle = entry.needle_id;
+            indexes.insert(entry.needle_id, entry);
         }
 
         Ok(Index {

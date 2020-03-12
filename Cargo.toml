@@ -48,4 +48,4 @@ log = "0.4.8"
 chrono = { version = "0.4", features = ["serde"] }
 
 # async std
-async-std = {version = "*", features = ["std"]}
+async-std = {version = "1.5", features = ["std"]}

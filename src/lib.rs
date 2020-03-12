@@ -1,4 +1,5 @@
 pub use error::{Error, Result};
+pub use macros::*;
 
 #[macro_use]
 pub mod macros;
