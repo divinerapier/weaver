@@ -27,7 +27,7 @@ impl From<&str> for VolumeExtension {
         match t {
             "index" | "idx" => VolumeExtension::Index,
             "data" | "dat" => VolumeExtension::Data,
-            _ => VolumeExtension::Unknown
+            _ => VolumeExtension::Unknown,
         }
     }
 }
@@ -191,15 +191,22 @@ impl From<&[u8]> for SuperBlock {
 }
 
 // 18009840492
-pub struct VolumeBuilder<P, C> where P: AsRef<Path>, C: IndexCodec {
+pub struct VolumeBuilder<P, C>
+where
+    P: AsRef<Path>,
+    C: IndexCodec,
+{
     dir: Option<P>,
     size: Option<u64>,
     super_block: Option<SuperBlock>,
     codec: Option<C>,
 }
 
-
-impl<P, C> VolumeBuilder<P, C> where P: AsRef<Path>, C: IndexCodec {
+impl<P, C> VolumeBuilder<P, C>
+where
+    P: AsRef<Path>,
+    C: IndexCodec,
+{
     pub fn new() -> VolumeBuilder<P, C> {
         VolumeBuilder {
             dir: None,
@@ -228,8 +235,8 @@ impl<P, C> VolumeBuilder<P, C> where P: AsRef<Path>, C: IndexCodec {
 }
 
 impl<C> Volume<C>
-    where
-        C: IndexCodec,
+where
+    C: IndexCodec,
 {
     /// Create a new volume on the specified directory with the id as its name.
     /// And set the size and replica replacement of the volume.
@@ -240,8 +247,8 @@ impl<C> Volume<C>
         super_block: &SuperBlock,
         codec: C,
     ) -> Result<Volume<C>>
-        where
-            C: super::index::Codec,
+    where
+        C: super::index::Codec,
     {
         let volume_path: PathBuf = dir.as_ref().join(format!("{}.data", id));
         let index_path: PathBuf = dir.as_ref().join(format!("{}.index", id));

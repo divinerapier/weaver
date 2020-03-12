@@ -3,11 +3,10 @@ use std::path::{Path, PathBuf};
 
 use async_std::sync::{Arc, RwLock};
 
+use super::index::Codec;
+use super::volume::{ReplicaReplacement, SuperBlock, Volume, VolumeExtension};
 use crate::error::Result;
 use crate::needle::Needle;
-use super::index::{Codec};
-use super::volume::{VolumeExtension, Volume, SuperBlock, ReplicaReplacement};
-
 
 pub struct StorageBuilder {
     directory: Option<PathBuf>,
@@ -27,8 +26,11 @@ impl StorageBuilder {
         self.directory = Some(dir);
         self
     }
-    pub fn set_address(mut self, ip: String, port: u16) -> StorageBuilder {
-        self.ip = Some(ip);
+    pub fn set_address<S>(mut self, ip: S, port: u16) -> StorageBuilder
+    where
+        S: Into<String>,
+    {
+        self.ip = Some(ip.into());
         self.port = port;
         self
     }
@@ -36,7 +38,10 @@ impl StorageBuilder {
 }
 
 /// Storage consists of many volumes.
-struct InnerStorage<C> where C: Codec {
+struct InnerStorage<C>
+where
+    C: Codec,
+{
     /// location to store volumes
     pub directory: PathBuf,
 
@@ -54,7 +59,10 @@ struct InnerStorage<C> where C: Codec {
     pub readonly_volumes: HashSet<u64>,
 }
 
-impl<C> InnerStorage<C> where C: Codec {
+impl<C> InnerStorage<C>
+where
+    C: Codec,
+{
     // Create a storage instance on the specified directory and network address.
     // Open if there are some volumes located at.
     pub async fn open(dir: &str, ip: &str, port: u16, codec: C) -> Result<InnerStorage<C>> {
@@ -149,17 +157,25 @@ impl<C> InnerStorage<C> where C: Codec {
 }
 
 #[derive(Clone)]
-pub struct Storage<C> where C: Codec {
+pub struct Storage<C>
+where
+    C: Codec,
+{
     inner: Arc<RwLock<InnerStorage<C>>>,
 }
 
-impl<C> Storage<C> where C: Codec {
+impl<C> Storage<C>
+where
+    C: Codec,
+{
     // Create a storage instance on the specified directory and network address.
     // Open if there are some volumes located at.
     pub async fn open(dir: &str, ip: &str, port: u16, codec: C) -> Result<Storage<C>> {
-        InnerStorage::open(dir, ip, port, codec).await.map(|s| Storage {
-            inner: Arc::new(RwLock::new(s)),
-        })
+        InnerStorage::open(dir, ip, port, codec)
+            .await
+            .map(|s| Storage {
+                inner: Arc::new(RwLock::new(s)),
+            })
     }
 
     pub async fn create_volume(
@@ -171,17 +187,20 @@ impl<C> Storage<C> where C: Codec {
     ) -> Result<()> {
         let mut storage = self.inner.write().await;
         if storage.volumes.contains_key(&volume_id) {
-            return Err(crate::error!("failed to create an exists volume {}", volume_id));
+            return Err(crate::error!(
+                "failed to create an exists volume {}",
+                volume_id
+            ));
         }
-        let super_block =
-            SuperBlock::new(&replica_replacement, max_volume_size, max_needle_count);
+        let super_block = SuperBlock::new(&replica_replacement, max_volume_size, max_needle_count);
         let volume = Volume::new(
             &storage.directory,
             volume_id,
             max_volume_size as u64,
             &super_block,
             storage.codec.clone(),
-        ).await?;
+        )
+        .await?;
 
         if volume.writable() {
             storage.writable_volumes.insert(volume_id);

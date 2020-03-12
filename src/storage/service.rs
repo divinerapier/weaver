@@ -5,17 +5,23 @@ use tokio::sync::mpsc::Receiver;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 
-use proto::storage::*;
 use super::index::Codec;
+use proto::storage::*;
 
-use super::storage::Storage;
+use super::storage::{Storage, StorageBuilder};
 
 // clone trait required by `fn create_directory`, so inner fields must be arc
-pub struct StorageService<C> where C: Codec {
+pub struct StorageService<C>
+where
+    C: Codec,
+{
     storage: Storage<C>,
 }
 
-impl<C> StorageService<C> where C: Codec + Send + Sync + 'static {
+impl<C> StorageService<C>
+where
+    C: Codec + Send + Sync + 'static,
+{
     pub async fn new(dir: &str, ip: &str, port: u16, codec: C) -> StorageService<C> {
         StorageService {
             storage: Storage::open(dir, ip, port, codec).await.unwrap(),
@@ -23,8 +29,59 @@ impl<C> StorageService<C> where C: Codec + Send + Sync + 'static {
     }
 }
 
+pub struct StorageServiceBuilder<C>
+where
+    C: Codec,
+{
+    dir: String,
+    ip: String,
+    port: u16,
+    codec: Option<C>,
+}
+
+impl<C> StorageServiceBuilder<C>
+where
+    C: Codec,
+{
+    pub fn new() -> StorageServiceBuilder<C> {
+        StorageServiceBuilder {
+            dir: String::default(),
+            ip: String::default(),
+            port: 0,
+            codec: None,
+        }
+    }
+    pub fn set_dir<S>(mut self, dir: S) -> StorageServiceBuilder<C>
+    where
+        S: Into<String>,
+    {
+        self.dir = dir.into();
+        self
+    }
+    pub fn set_address<S>(mut self, ip: S, port: u16) -> StorageServiceBuilder<C>
+    where
+        S: Into<String>,
+    {
+        self.ip = ip.into();
+        self.port = port;
+        self
+    }
+    pub fn set_codec(mut self, codec: C) -> StorageServiceBuilder<C> {
+        self.codec = Some(codec);
+        self
+    }
+    pub async fn build(self) -> crate::error::Result<StorageService<C>> {
+        Ok(StorageService {
+            storage: Storage::open(&self.dir, &self.ip, self.port, self.codec.unwrap()).await?,
+        })
+    }
+}
+
 #[tonic::async_trait]
-impl<C> storage_server::Storage for StorageService<C> where C: Codec + Send + Sync + 'static {
+impl<C> storage_server::Storage for StorageService<C>
+where
+    C: Codec + Send + Sync + 'static,
+{
     /// Create a new volume with the specified replica replacement.
     async fn allocate_volume(
         &self,
@@ -57,8 +114,8 @@ impl<C> storage_server::Storage for StorageService<C> where C: Codec + Send + Sy
         futures::pin_mut!(stream);
 
         fn check_and_set<T>(old: &mut Option<T>, new: &Option<T>) -> crate::error::Result<()>
-            where
-                T: Eq + PartialEq + Clone + std::fmt::Debug,
+        where
+            T: Eq + PartialEq + Clone + std::fmt::Debug,
         {
             if new.is_none() {
                 return Err(crate::error!("invalid volume id or needle id"));
@@ -167,7 +224,7 @@ impl<C> storage_server::Storage for StorageService<C> where C: Codec + Send + Sy
                     }
                     Err(err) => tx.send(Err(Status::from(err))),
                 }
-                    .await;
+                .await;
                 if let Err(e) = res {
                     log::error!("failed to send needle body. {}", e);
                 }
