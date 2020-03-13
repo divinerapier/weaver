@@ -14,7 +14,7 @@ weaver = {path = "../../weaver", version = "0.1.0"}
 
 # transport and protocol
 tonic = { version = "0.1.1", features = ["tls"] }
-bytes = "0.4"
+bytes = "0.5"
 prost = "0.6"
 tokio = { version = "0.2", features = ["rt-threaded", "time", "stream", "fs", "macros", "uds"] }
 futures = { version = "0.3", default-features = false, features = ["alloc"]}
