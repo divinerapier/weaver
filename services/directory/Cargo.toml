@@ -21,7 +21,7 @@ tokio = { version = "0.2", features = ["rt-threaded", "time", "stream", "fs", "m
 futures = { version = "0.3", default-features = false, features = ["alloc"]}
 async-stream = "0.2"
 http = "0.2"
-tower = "0.3"
+tower = "0.4"
 
 # logger
 env_logger = "0.6.2"
