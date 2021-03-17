@@ -13,7 +13,7 @@ proto = {path = "../../proto", version = "0.1.0"}
 weaver = {path = "../../weaver", version = "0.1.0"}
 
 # transport and protocol
-tonic = { version = "0.1.1", features = ["tls"] }
+tonic = { version = "0.4.1", features = ["tls"] }
 bytes = "0.4"
 prost = "0.6"
 
