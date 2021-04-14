@@ -12,7 +12,7 @@ publish = false
 tonic-build = "0.1.1"
 
 [dependencies]
-tonic = { version = "0.1.1", features = ["tls"] }
+tonic = { version = "0.4.2", features = ["tls"] }
 bytes = "0.4"
 prost = "0.6"
 
