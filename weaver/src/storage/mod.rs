@@ -13,4 +13,3 @@ pub mod service;
 pub mod storage;
 pub mod volume;
 pub mod volume_file;
-pub mod volume_iouring;
