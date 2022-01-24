@@ -13,7 +13,7 @@ pub enum Error {
     Storage(String),
     Directory(String),
     Internal(String),
-    External(Box<dyn std::error::Error>),
+    External(Box<dyn std::error::Error + Send>),
 }
 
 impl std::fmt::Display for Error {
@@ -41,10 +41,6 @@ impl std::fmt::Debug for Error {
         }
     }
 }
-
-unsafe impl Send for Error {}
-
-unsafe impl Sync for Error {}
 
 impl std::error::Error for Error {}
 
@@ -79,7 +75,7 @@ impl Error {
 
     pub fn dependency<E>(e: E) -> Error
     where
-        E: std::error::Error + 'static,
+        E: std::error::Error + Send + 'static,
     {
         Error::External(Box::new(e))
     }

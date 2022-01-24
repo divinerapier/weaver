@@ -206,7 +206,7 @@ where
         tokio::spawn(async move {
             let mut iter = needle.body.into_iter();
             let mut offset = 0;
-            while let Some(body) = iter.next() {
+            for body in &mut iter {
                 let res = match body {
                     Ok(body) => {
                         let body: bytes::Bytes = body;

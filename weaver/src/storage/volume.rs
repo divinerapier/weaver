@@ -3,6 +3,7 @@ use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, Mutex, RwLock,
@@ -16,27 +17,39 @@ use crate::needle::{Needle, NeedleBody, NeedleHeader};
 use crate::storage::index::{Codec as IndexCodec, Entry as IndexEntry, Index};
 use crate::utils;
 
-pub enum VolumeExtension {
+pub enum Extension {
     Index = 1,
     Data = 2,
     Unknown = 99,
 }
 
-impl From<&str> for VolumeExtension {
-    fn from(t: &str) -> VolumeExtension {
-        match t {
-            "index" | "idx" => VolumeExtension::Index,
-            "data" | "dat" => VolumeExtension::Data,
-            _ => VolumeExtension::Unknown,
+impl FromStr for Extension {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "index" | "idx" => Ok(Extension::Index),
+            "data" | "dat" => Ok(Extension::Data),
+            _ => Ok(Extension::Unknown),
         }
     }
 }
 
-impl From<&OsStr> for VolumeExtension {
-    fn from(t: &OsStr) -> VolumeExtension {
+impl From<&str> for Extension {
+    fn from(t: &str) -> Extension {
+        match t {
+            "index" | "idx" => Extension::Index,
+            "data" | "dat" => Extension::Data,
+            _ => Extension::Unknown,
+        }
+    }
+}
+
+impl From<&OsStr> for Extension {
+    fn from(t: &OsStr) -> Extension {
         match t.to_str() {
-            None => VolumeExtension::Unknown,
-            Some(s) => VolumeExtension::from(s),
+            None => Extension::Unknown,
+            Some(s) => Extension::from(s),
         }
     }
 }
@@ -625,7 +638,7 @@ mod test {
 
         for index in &indexes {
             let value = serde_json::to_string(index).unwrap();
-            file.write(value.as_bytes()).unwrap();
+            file.write_all(value.as_bytes()).unwrap();
             file.sync_all().unwrap();
         }
         file.seek(std::io::SeekFrom::Start(0)).unwrap();

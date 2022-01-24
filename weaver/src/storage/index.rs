@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -5,7 +7,6 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use byteorder::ByteOrder;
 
-#[allow(dead_code)]
 use crate::error::Result;
 
 pub trait Codec: Clone + Send + Sync {

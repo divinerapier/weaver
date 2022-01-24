@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use async_std::sync::{Arc, RwLock};
 
 use super::index::Codec;
-use super::volume::{ReplicaReplacement, SuperBlock, Volume, VolumeExtension};
+use super::volume::{Extension, ReplicaReplacement, SuperBlock, Volume};
 use crate::error::Result;
 use crate::needle::Needle;
 
@@ -91,13 +91,13 @@ where
                 }
             })
             .filter_map(|(entry, _)| {
-                match VolumeExtension::from(PathBuf::from(entry.file_name()).extension().unwrap()) {
-                    VolumeExtension::Index => {
+                match Extension::from(PathBuf::from(entry.file_name()).extension().unwrap()) {
+                    Extension::Index => {
                         // file_name, eg: 1.index
                         // index_files.push(entry.file_name());
                         Some(entry.file_name())
                     }
-                    VolumeExtension::Data | VolumeExtension::Unknown => {
+                    Extension::Data | Extension::Unknown => {
                         log::warn!("open store. skip entry: {:?}", entry.file_name());
                         None
                     }
