@@ -1,14 +1,10 @@
 use futures::{Stream, StreamExt};
-use serde_json::ser::State;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::Receiver;
-use tonic::transport::Server;
+use proto::storage::*;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
 use super::index::Codec;
-use proto::storage::*;
-
-use super::storage::{Storage, StorageBuilder};
+use super::storage::Storage;
 
 // clone trait required by `fn create_directory`, so inner fields must be arc
 pub struct StorageService<C>
@@ -108,7 +104,7 @@ where
     /// Write the needle to a volume.
     async fn write_needle(
         &self,
-        request: Request<tonic::Streaming<WriteNeedleRequest>>,
+        request: tonic::Request<tonic::Streaming<WriteNeedleRequest>>,
     ) -> Result<Response<WriteNeedleResponse>, Status> {
         let stream = request.into_inner();
         futures::pin_mut!(stream);
@@ -191,10 +187,12 @@ where
     }
 
     #[doc = "Server streaming response type for the ReadNeedle method."]
-    type ReadNeedleStream = Receiver<Result<ReadNeedleResponse, Status>>;
+    // type ReadNeedleStream = Receiver<Result<ReadNeedleResponse, Status>>;
+    type ReadNeedleStream = ReceiverStream<Result<ReadNeedleResponse, Status>>;
+
     async fn read_needle(
         &self,
-        request: Request<ReadNeedleRequest>,
+        request: tonic::Request<ReadNeedleRequest>,
     ) -> Result<Response<Self::ReadNeedleStream>, Status> {
         let request: ReadNeedleRequest = request.into_inner();
         let volume_id = request.volume_id;
@@ -231,6 +229,6 @@ where
             }
         });
 
-        Ok(tonic::Response::new(rx))
+        Ok(tonic::Response::new(ReceiverStream::new(rx)))
     }
 }

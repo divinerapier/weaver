@@ -11,18 +11,18 @@ publish = false
 proto = {path = "../../proto", version = "0.1.0"}
 weaver = {path = "../../weaver", version = "0.1.0"}
 
-tonic = { version = "0.1.1", features = ["tls"] }
-bytes = "0.4"
-prost = "0.6"
+tonic = { version = "0.6.1", features = ["tls"] }
+bytes = "1.1.0"
+prost = "0.9.0"
 
-tokio = { version = "0.2", features = ["rt-threaded", "time", "stream", "fs", "macros", "uds"] }
+tokio = { version = "1", features = ["full"] }
 futures = { version = "0.3", default-features = false, features = ["alloc"]}
-async-stream = "0.2"
+async-stream = "0.3.2"
 http = "0.2"
-tower = "0.3"
+tower = "0.4.11"
 
-env_logger = "0.6.2"
+env_logger = "0.9.0"
 log = "0.4.8"
-md-5 = "0.8.0"
+md-5 = "0.9.1"
 
 clap = "2.33.0"

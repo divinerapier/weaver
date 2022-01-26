@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port = matches.value_of("port").unwrap().parse::<u16>().unwrap();
     let path = matches.value_of("path").unwrap();
 
-    env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     log::set_max_level(log::LevelFilter::max());
     let svc = proto::storage::storage_server::StorageServer::new(
         weaver::storage::service::StorageServiceBuilder::new()

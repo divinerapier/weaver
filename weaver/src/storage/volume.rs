@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
@@ -9,13 +8,11 @@ use std::sync::{
     Arc, Mutex, RwLock,
 };
 
-use bytes::ByteOrder;
-use serde_json::Deserializer;
+use byteorder::ByteOrder;
 
 use crate::error::Result;
 use crate::needle::{Needle, NeedleBody, NeedleHeader};
 use crate::storage::index::{Codec as IndexCodec, Entry as IndexEntry, Index};
-use crate::utils;
 
 pub enum Extension {
     Index = 1,
@@ -161,9 +158,9 @@ impl SuperBlock {
         let value = (self.replica_replacement.data_center_count as u32) << 16
             | (self.replica_replacement.rack_count as u32) << 8
             | self.replica_replacement.node_count as u32;
-        bytes::BigEndian::write_u32(&mut buffer[0..4], value);
-        bytes::BigEndian::write_u32(&mut buffer[4..8], self.max_volume_size);
-        bytes::BigEndian::write_u32(&mut buffer[8..], self.max_needle_count);
+        byteorder::BigEndian::write_u32(&mut buffer[0..4], value);
+        byteorder::BigEndian::write_u32(&mut buffer[4..8], self.max_volume_size);
+        byteorder::BigEndian::write_u32(&mut buffer[8..], self.max_needle_count);
         buffer
     }
 
@@ -185,9 +182,9 @@ impl SuperBlock {
 impl From<&[u8]> for SuperBlock {
     fn from(data: &[u8]) -> Self {
         assert!(data.len() >= 12);
-        let value = bytes::BigEndian::read_u32(&data[0..4]);
-        let max_volume_size = bytes::BigEndian::read_u32(&data[4..8]);
-        let max_needle_count = bytes::BigEndian::read_u32(&data[8..12]);
+        let value = byteorder::BigEndian::read_u32(&data[0..4]);
+        let max_volume_size = byteorder::BigEndian::read_u32(&data[4..8]);
+        let max_needle_count = byteorder::BigEndian::read_u32(&data[8..12]);
         let data_center_count = ((value & 0x0f00) >> 16) as u8;
         let rack_count = ((value & 0x00f0) >> 8) as u8;
         let node_count = (value & 0x000f) as u8;
@@ -492,12 +489,12 @@ where
         assert_eq!(header.size as usize, body.len());
 
         let mut buffer = vec![0u8; 40];
-        bytes::BigEndian::write_u64(&mut buffer[0..8], header.id);
-        bytes::BigEndian::write_u64(&mut buffer[8..16], header.cookie);
-        bytes::BigEndian::write_u64(&mut buffer[16..24], header.offset);
-        bytes::BigEndian::write_u32(&mut buffer[24..28], header.size);
-        bytes::BigEndian::write_u64(&mut buffer[28..36], header.total_size);
-        bytes::BigEndian::write_u32(&mut buffer[36..40], header.crc);
+        byteorder::BigEndian::write_u64(&mut buffer[0..8], header.id);
+        byteorder::BigEndian::write_u64(&mut buffer[8..16], header.cookie);
+        byteorder::BigEndian::write_u64(&mut buffer[16..24], header.offset);
+        byteorder::BigEndian::write_u32(&mut buffer[24..28], header.size);
+        byteorder::BigEndian::write_u64(&mut buffer[28..36], header.total_size);
+        byteorder::BigEndian::write_u32(&mut buffer[36..40], header.crc);
 
         {
             let writable_volume = self.writable_volume.clone();
@@ -598,7 +595,8 @@ where
                     }
                 };
                 remains -= current as u32;
-                match tx.send(Ok(bytes::Bytes::from(&buffer[0..current]))) {
+                let buf = buffer[0..current].to_owned();
+                match tx.send(Ok(bytes::Bytes::from(buf))) {
                     Ok(_) => {}
                     Err(e) => {
                         log::error!("failed to read from volume. error: {:?}", e);

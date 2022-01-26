@@ -32,17 +32,17 @@ pub struct BinaryCodec;
 impl Codec for BinaryCodec {
     fn encode(&self, entry: &Entry) -> Result<Vec<u8>> {
         let mut data = vec![0; 24];
-        bytes::BigEndian::write_u64(&mut data[0..8], entry.needle_id);
-        bytes::BigEndian::write_u64(&mut data[8..16], entry.offset as u64);
-        bytes::BigEndian::write_u64(&mut data[16..24], entry.length as u64);
+        byteorder::BigEndian::write_u64(&mut data[0..8], entry.needle_id);
+        byteorder::BigEndian::write_u64(&mut data[8..16], entry.offset as u64);
+        byteorder::BigEndian::write_u64(&mut data[16..24], entry.length as u64);
         Ok(data)
     }
     fn decode(&self, data: &[u8]) -> Result<Entry> {
         assert_eq!(data.len(), 24);
         Ok(Entry {
-            needle_id: bytes::BigEndian::read_u64(&data[0..8]),
-            offset: bytes::BigEndian::read_u64(&data[8..16]) as usize,
-            length: bytes::BigEndian::read_u64(&data[16..24]) as usize,
+            needle_id: byteorder::BigEndian::read_u64(&data[0..8]),
+            offset: byteorder::BigEndian::read_u64(&data[8..16]) as usize,
+            length: byteorder::BigEndian::read_u64(&data[16..24]) as usize,
         })
     }
 }

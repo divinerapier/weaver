@@ -1,12 +1,7 @@
-use futures::{Stream, StreamExt};
 use std::collections::HashMap;
-use std::path::Path;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc, RwLock,
-};
-use tokio::sync::mpsc;
-use tonic::{Request, Response, Status};
+use std::sync::{Arc, RwLock};
+use tokio_stream::wrappers::ReceiverStream;
+use tonic::{Response, Status};
 
 pub struct MasterService {
     not_ready_volumes: Arc<RwLock<HashMap<u64, ()>>>,
@@ -25,8 +20,7 @@ impl MasterService {
 #[tonic::async_trait]
 impl proto::master::master_server::Master for MasterService {
     #[doc = "Server streaming response type for the SendHeartbeat method."]
-    type HeartbeatStream =
-        tokio::sync::mpsc::Receiver<Result<proto::master::HeartbeatResponse, Status>>;
+    type HeartbeatStream = ReceiverStream<Result<proto::master::HeartbeatResponse, Status>>;
 
     async fn heartbeat(
         &self,
@@ -38,7 +32,7 @@ impl proto::master::master_server::Master for MasterService {
         tokio::spawn(async move {
             futures::pin_mut!(stream);
         });
-        Ok(Response::new(rx))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
     async fn lookup_volume(

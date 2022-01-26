@@ -71,8 +71,6 @@ where
             std::fs::create_dir_all(dir)?;
         }
 
-        std::fs::OpenOptions::new();
-
         let filelist = std::fs::read_dir(dir)?;
 
         let index_files = filelist
