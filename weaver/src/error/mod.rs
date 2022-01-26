@@ -1,5 +1,7 @@
 use std::sync::mpsc;
 
+use thiserror::Error;
+
 pub use directory_error::DirectoryError;
 pub use master_error::MasterError;
 pub use storage_error::StorageError;
@@ -113,3 +115,29 @@ impl From<Error> for tonic::Status {
         tonic::Status::new(tonic::Code::Unknown, e.to_string())
     }
 }
+
+#[derive(Debug, Error)]
+pub enum VolumeError {
+    #[error("volume: {0}/{1} not found")]
+    NeedleNotFound(u64, u64),
+
+    #[error("io")]
+    IO(#[from] std::io::Error),
+
+    #[error("channel")]
+    Channel,
+}
+
+impl PartialEq for VolumeError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::NeedleNotFound(ref l0, ref l1), Self::NeedleNotFound(r0, r1)) => {
+                l0 == r0 && l1 == r1
+            }
+            (Self::IO(l0), Self::IO(r0)) => l0.kind() == r0.kind(),
+            (_, _) => false,
+        }
+    }
+}
+
+impl Eq for VolumeError {}

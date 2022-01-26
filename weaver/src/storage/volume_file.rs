@@ -6,7 +6,10 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+use crate::error::VolumeError;
+
 struct VolumeFiles {
+    id: u64,
     current_size: u64,
     data_file: std::fs::File,
     index_file: std::fs::File,
@@ -41,14 +44,12 @@ impl NeedleIndexes {
 pub struct VolumeImpl {
     read_sender: tokio::sync::mpsc::Sender<(
         u64,
-        tokio::sync::oneshot::Sender<
-            std::result::Result<Vec<u8>, Box<dyn std::error::Error + Send>>,
-        >,
+        tokio::sync::oneshot::Sender<std::result::Result<Vec<u8>, VolumeError>>,
     )>,
     write_sender: tokio::sync::mpsc::Sender<(
         u64,
         Vec<u8>,
-        tokio::sync::oneshot::Sender<std::result::Result<(), Box<dyn std::error::Error + Send>>>,
+        tokio::sync::oneshot::Sender<std::result::Result<(), VolumeError>>,
     )>,
 }
 
@@ -59,6 +60,7 @@ impl VolumeFiles {
         let current_size = data_file.metadata().unwrap().len();
         let indexes = NeedleIndexes::new(index_file.try_clone().unwrap());
         VolumeFiles {
+            id: index as u64,
             data_file,
             index_file,
             current_size,
@@ -70,20 +72,13 @@ impl VolumeFiles {
         let reader = VolumeFiles {
             data_file: self.data_file.try_clone().unwrap(),
             index_file: self.index_file.try_clone().unwrap(),
-            current_size: self.current_size,
             indexes: self.indexes.clone(),
+            ..self
         };
-        let writer = VolumeFiles {
-            data_file: self.data_file.try_clone().unwrap(),
-            index_file: self.index_file.try_clone().unwrap(),
-            current_size: self.current_size,
-            indexes: self.indexes,
-        };
-        (reader, writer)
+        (reader, self)
     }
 
     fn openfile<P: AsRef<Path>>(path: P) -> std::fs::File {
-        log::error!("path: {:?}", std::fs::canonicalize(path.as_ref()));
         let dir = path.as_ref().parent().unwrap();
         if let Err(e) = std::fs::create_dir_all(dir) {
             if e.kind() != std::io::ErrorKind::AlreadyExists {
@@ -91,6 +86,7 @@ impl VolumeFiles {
                 panic!("create dir")
             }
         }
+        log::debug!("path: {:?}", std::fs::canonicalize(dir));
         std::fs::OpenOptions::new()
             .append(true)
             .create(true)
@@ -104,9 +100,7 @@ impl VolumeFiles {
         mut self,
         mut receiver: tokio::sync::mpsc::Receiver<(
             u64,
-            tokio::sync::oneshot::Sender<
-                std::result::Result<Vec<u8>, Box<dyn std::error::Error + Send>>,
-            >,
+            tokio::sync::oneshot::Sender<std::result::Result<Vec<u8>, VolumeError>>,
         )>,
     ) {
         std::thread::spawn(move || {
@@ -115,31 +109,24 @@ impl VolumeFiles {
                 .unwrap();
             runtime.block_on(async move {
                 while let Some((key, sender)) = receiver.recv().await {
-                    match self.read_process(key).await {
-                        Ok(buf) => {
-                            if sender.send(Ok(buf)).is_err() {
-                                log::error!("key: {}. the receiver dropped", key,)
-                            }
-                        }
-                        Err(e) => {
-                            log::error!("key: {}. error: {}", key, e);
-                        }
+                    if sender.send(self.read_process(key).await).is_err() {
+                        log::error!("key: {}. the receiver dropped", key,)
                     }
                 }
             });
-            log::error!("quit read thread")
+            log::warn!("quit read thread")
         });
     }
 
-    async fn read_process(
-        &mut self,
-        key: u64,
-    ) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+    async fn read_process(&mut self, key: u64) -> std::result::Result<Vec<u8>, VolumeError> {
         let indexes = match self.indexes.0.read() {
             Ok(idx) => idx,
             Err(a) => a.into_inner(),
         };
-        let index = indexes.get(&key).ok_or_else(|| String::from(""))?;
+        let index = indexes
+            .get(&key)
+            .ok_or(VolumeError::NeedleNotFound(self.id, key))?;
+        log::info!("key: {} offset: {}", key, index.offset);
         self.data_file.seek(SeekFrom::Start(index.offset))?;
         let mut buf = vec![0u8; index.size as usize];
         self.data_file.read_exact(&mut buf)?;
@@ -151,9 +138,7 @@ impl VolumeFiles {
         mut receiver: tokio::sync::mpsc::Receiver<(
             u64,
             Vec<u8>,
-            tokio::sync::oneshot::Sender<
-                std::result::Result<(), Box<dyn std::error::Error + Send>>,
-            >,
+            tokio::sync::oneshot::Sender<std::result::Result<(), VolumeError>>,
         )>,
     ) {
         std::thread::spawn(move || {
@@ -163,27 +148,14 @@ impl VolumeFiles {
             runtime.block_on(async move {
                 while let Some((key, buf, sender)) = receiver.recv().await {
                     log::info!("write. key: {}, buf: {:?}", key, buf);
-                    match self.write_process(key, buf).await {
-                        Ok(()) => {
-                            if sender.send(Ok(())).is_err() {
-                                log::error!(
-                                    "failed to send ok value. key: {}. the receiver dropped",
-                                    key
-                                )
-                            }
-                        }
-                        Err(e) => {
-                            log::error!("write process. key: {}, error: {}", key, e);
-                            if sender.send(Ok(())).is_err() {
-                                log::error!(
-                                    "failed to send err value. key: {}. the receiver dropped",
-                                    key
-                                )
-                            }
-                        }
+                    if sender.send(self.write_process(key, buf).await).is_err() {
+                        log::error!(
+                            "failed to send err value. key: {}. the receiver dropped",
+                            key
+                        )
                     }
                 }
-                log::error!("quit write thread")
+                log::warn!("quit write thread")
             })
         });
     }
@@ -192,7 +164,7 @@ impl VolumeFiles {
         &mut self,
         key: u64,
         buf: Vec<u8>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ) -> std::result::Result<(), VolumeError> {
         self.data_file.write_all(&buf)?;
         let index = NeedleIndex {
             key,
@@ -201,27 +173,14 @@ impl VolumeFiles {
             offset: self.current_size,
             size: buf.len() as u32,
         };
-        let buf = serde_json::to_string(&index).unwrap();
-        self.index_file.write_all(buf.as_bytes()).unwrap();
+        let index_buf = serde_json::to_string(&index).unwrap();
+        self.index_file.write_all(index_buf.as_bytes()).unwrap();
         let mut indexes = match self.indexes.0.write() {
             Ok(idx) => idx,
             Err(a) => a.into_inner(),
         };
+        self.current_size += index.size as u64;
         indexes.insert(key, index);
-        Ok(())
-    }
-
-    fn write_buffer(&mut self, buf: &[u8]) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        self.data_file.write_all(buf)?;
-
-        let index = NeedleIndex {
-            key: 0,
-            alternate_key: 0,
-            flags: 0,
-            offset: self.current_size,
-            size: buf.len() as u32,
-        };
-        serde_json::to_string(&index)?;
         Ok(())
     }
 }
@@ -230,8 +189,8 @@ impl VolumeImpl {
     pub fn new<P: AsRef<Path>>(dir: P, index: usize) -> VolumeImpl {
         let (read_sender, read_receiver) = tokio::sync::mpsc::channel(128);
         let (write_sender, write_receiver) = tokio::sync::mpsc::channel(128);
-        let files = VolumeFiles::new(dir.as_ref(), index);
-        let (reader, writer) = files.split();
+        let volume = VolumeFiles::new(dir.as_ref(), index);
+        let (reader, writer) = volume.split();
 
         reader.start_read(read_receiver);
         writer.start_write(write_receiver);
@@ -242,11 +201,7 @@ impl VolumeImpl {
         }
     }
 
-    pub async fn write(
-        &mut self,
-        key: u64,
-        buf: Vec<u8>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error + Send>> {
+    pub async fn write(&mut self, key: u64, buf: Vec<u8>) -> std::result::Result<(), VolumeError> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.write_sender.send((key, buf, tx)).await.unwrap();
         match rx.await {
@@ -259,10 +214,7 @@ impl VolumeImpl {
         }
     }
 
-    pub async fn read(
-        &mut self,
-        key: u64,
-    ) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error + Send>> {
+    pub async fn read(&mut self, key: u64) -> std::result::Result<Vec<u8>, VolumeError> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         if let Err(e) = self.read_sender.send((key, tx)).await {
             log::error!("send read. key: {}, error: {}", key, e);
@@ -271,7 +223,7 @@ impl VolumeImpl {
         match rx.await {
             Err(e) => {
                 log::error!("recv read. key: {}, error: {}", key, e);
-                Ok(vec![])
+                Err(VolumeError::Channel)
             }
             Ok(Err(e)) => Err(e),
             Ok(Ok(buf)) => Ok(buf),
@@ -288,36 +240,41 @@ mod test {
         env_logger::builder()
             .format_target(true)
             .format_target(true)
-            .format(|buf, record| {
-                let mut style = buf.style();
-                // style.set_bg(Color::Yellow).set_bold(true);
-
-                let timestamp = buf.timestamp();
-
-                writeln!(
-                    buf,
-                    "{} {}:{} {}",
-                    timestamp,
-                    style.value(record.file().unwrap()),
-                    style.value(record.line().unwrap()),
-                    style.value(record.args())
-                )
-            })
+            .filter_level(log::LevelFilter::Debug)
             .init();
+
+        test1().await;
+        test2().await;
+    }
+    async fn test1() {
+        std::fs::remove_dir_all("./testdata").unwrap();
         let mut volume = VolumeImpl::new("./testdata", 1);
         let mut v = volume.clone();
         let task1 = tokio::spawn(async move { v.write(10, "hello world".bytes().collect()).await });
         let mut v = volume.clone();
-        let task2 =
-            tokio::spawn(async move { v.write(10, "hello world2".bytes().collect()).await });
-        if let Err(e) = volume.read(12).await {
-            log::error!("{}", e);
-        }
+
         if let Err(e) = task1.await {
             log::error!("{}", e);
         }
+        let task2 =
+            tokio::spawn(async move { v.write(10, "hello world2".bytes().collect()).await });
         if let Err(e) = task2.await {
             log::error!("{}", e);
         }
+        assert_eq!(
+            Err(VolumeError::NeedleNotFound(1, 12)),
+            volume.read(12).await
+        );
+        assert_eq!(
+            "hello world2".bytes().collect::<Vec<u8>>(),
+            volume.read(10).await.unwrap()
+        );
+    }
+    async fn test2() {
+        let mut volume = VolumeImpl::new("./testdata", 1);
+        assert_eq!(
+            "hello world2".bytes().collect::<Vec<u8>>(),
+            volume.read(10).await.unwrap()
+        );
     }
 }
