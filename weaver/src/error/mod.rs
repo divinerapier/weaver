@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::{path::PathBuf, sync::mpsc};
 
 use thiserror::Error;
 
@@ -125,7 +125,10 @@ pub enum VolumeError {
     IO(#[from] std::io::Error),
 
     #[error("channel")]
-    Channel,
+    ChannelClosed,
+
+    #[error("not a dir {0}")]
+    NotDir(PathBuf),
 }
 
 impl PartialEq for VolumeError {

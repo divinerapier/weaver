@@ -1,12 +1,17 @@
 use std::{
+    collections::HashMap,
     io::{Read, Seek, SeekFrom, Write},
     path::Path,
     sync::{Arc, RwLock},
 };
 
 use serde::{Deserialize, Serialize};
+use tokio::sync::{
+    mpsc::{Receiver as MpscReceiver, Sender as MpscSender},
+    oneshot::Sender as OneshotSender,
+};
 
-use crate::error::VolumeError;
+use crate::{directory::DirectoryStorage, error::VolumeError};
 
 struct VolumeFiles {
     id: u64,
@@ -26,11 +31,11 @@ struct NeedleIndex {
 }
 
 #[derive(Clone)]
-struct NeedleIndexes(Arc<RwLock<std::collections::HashMap<u64, NeedleIndex>>>);
+struct NeedleIndexes(Arc<RwLock<HashMap<u64, NeedleIndex>>>);
 
 impl NeedleIndexes {
     pub fn new(file: std::fs::File) -> NeedleIndexes {
-        let mut map = std::collections::HashMap::new();
+        let mut map = HashMap::new();
         let reader = std::io::BufReader::new(file);
         let mut iter = serde_json::Deserializer::from_reader(reader).into_iter::<NeedleIndex>();
         while let Some(Ok(index)) = iter.next() {
@@ -40,32 +45,67 @@ impl NeedleIndexes {
     }
 }
 
+type ReadSender = MpscSender<(
+    u64,
+    OneshotSender<std::result::Result<Vec<u8>, VolumeError>>,
+)>;
+
+type ReadReceiver = MpscReceiver<(
+    u64,
+    OneshotSender<std::result::Result<Vec<u8>, VolumeError>>,
+)>;
+
+type WriteSender = MpscSender<(
+    u64,
+    Vec<u8>,
+    OneshotSender<std::result::Result<(), VolumeError>>,
+)>;
+
+type WriteReceiver = MpscReceiver<(
+    u64,
+    Vec<u8>,
+    OneshotSender<std::result::Result<(), VolumeError>>,
+)>;
+
 #[derive(Clone)]
 pub struct VolumeImpl {
-    read_sender: tokio::sync::mpsc::Sender<(
-        u64,
-        tokio::sync::oneshot::Sender<std::result::Result<Vec<u8>, VolumeError>>,
-    )>,
-    write_sender: tokio::sync::mpsc::Sender<(
-        u64,
-        Vec<u8>,
-        tokio::sync::oneshot::Sender<std::result::Result<(), VolumeError>>,
-    )>,
+    read_sender: ReadSender,
+    write_sender: WriteSender,
 }
 
 impl VolumeFiles {
-    fn new<P: AsRef<Path>>(dir: P, index: usize) -> VolumeFiles {
-        let data_file = Self::openfile(dir.as_ref().join(format!("{}.dat", index)));
-        let index_file = Self::openfile(dir.as_ref().join(format!("{}.idx", index)));
-        let current_size = data_file.metadata().unwrap().len();
+    fn new<P: AsRef<Path>>(dir: P, index: usize) -> std::result::Result<VolumeFiles, VolumeError> {
+        let volume_dir = dir.as_ref().join(index.to_string());
+        Self::ensure_dir(dir.as_ref())?;
+        Self::ensure_dir(&volume_dir)?;
+        Self::load(volume_dir, index as u64)
+    }
+
+    fn load<P: AsRef<Path>>(dir: P, id: u64) -> std::result::Result<VolumeFiles, VolumeError> {
+        let data_file = Self::openfile(dir.as_ref().join("data"))?;
+        let index_file = Self::openfile(dir.as_ref().join("index"))?;
+        let current_size = data_file.metadata()?.len();
         let indexes = NeedleIndexes::new(index_file.try_clone().unwrap());
-        VolumeFiles {
-            id: index as u64,
+        Ok(VolumeFiles {
+            id,
             data_file,
             index_file,
             current_size,
             indexes,
+        })
+    }
+
+    fn ensure_dir<P: AsRef<Path>>(dir: P) -> std::result::Result<(), VolumeError> {
+        if !dir.as_ref().exists() {
+            log::info!("volume: create dir: {:?}", dir.as_ref());
+            std::fs::create_dir_all(dir.as_ref())?;
+            return Ok(());
         }
+        if dir.as_ref().is_dir() {
+            return Ok(());
+        }
+        log::error!("ensure volume: {:?} is not a dir", dir.as_ref());
+        Err(VolumeError::NotDir(dir.as_ref().to_path_buf()))
     }
 
     fn split(self) -> (VolumeFiles, VolumeFiles) {
@@ -78,35 +118,19 @@ impl VolumeFiles {
         (reader, self)
     }
 
-    fn openfile<P: AsRef<Path>>(path: P) -> std::fs::File {
-        let dir = path.as_ref().parent().unwrap();
-        if let Err(e) = std::fs::create_dir_all(dir) {
-            if e.kind() != std::io::ErrorKind::AlreadyExists {
-                log::error!("create dir all. path: {:?}, error: {}", path.as_ref(), e);
-                panic!("create dir")
-            }
-        }
-        log::debug!("path: {:?}", std::fs::canonicalize(dir));
-        std::fs::OpenOptions::new()
+    fn openfile<P: AsRef<Path>>(path: P) -> std::result::Result<std::fs::File, VolumeError> {
+        log::debug!("path: {:?}", std::fs::canonicalize(path.as_ref()));
+        Ok(std::fs::OpenOptions::new()
             .append(true)
             .create(true)
             .write(true)
             .read(true)
-            .open(path.as_ref())
-            .unwrap()
+            .open(path)?)
     }
 
-    fn start_read(
-        mut self,
-        mut receiver: tokio::sync::mpsc::Receiver<(
-            u64,
-            tokio::sync::oneshot::Sender<std::result::Result<Vec<u8>, VolumeError>>,
-        )>,
-    ) {
+    fn start_read(mut self, mut receiver: ReadReceiver) -> std::result::Result<(), VolumeError> {
+        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
         std::thread::spawn(move || {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .build()
-                .unwrap();
             runtime.block_on(async move {
                 while let Some((key, sender)) = receiver.recv().await {
                     if sender.send(self.read_process(key).await).is_err() {
@@ -116,6 +140,7 @@ impl VolumeFiles {
             });
             log::warn!("quit read thread")
         });
+        Ok(())
     }
 
     async fn read_process(&mut self, key: u64) -> std::result::Result<Vec<u8>, VolumeError> {
@@ -133,18 +158,9 @@ impl VolumeFiles {
         Ok(buf)
     }
 
-    fn start_write(
-        mut self,
-        mut receiver: tokio::sync::mpsc::Receiver<(
-            u64,
-            Vec<u8>,
-            tokio::sync::oneshot::Sender<std::result::Result<(), VolumeError>>,
-        )>,
-    ) {
+    fn start_write(mut self, mut receiver: WriteReceiver) -> std::result::Result<(), VolumeError> {
+        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
         std::thread::spawn(move || {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .build()
-                .unwrap();
             runtime.block_on(async move {
                 while let Some((key, buf, sender)) = receiver.recv().await {
                     log::info!("write. key: {}, buf: {:?}", key, buf);
@@ -158,6 +174,7 @@ impl VolumeFiles {
                 log::warn!("quit write thread")
             })
         });
+        Ok(())
     }
 
     async fn write_process(
@@ -186,24 +203,29 @@ impl VolumeFiles {
 }
 
 impl VolumeImpl {
-    pub fn new<P: AsRef<Path>>(dir: P, index: usize) -> VolumeImpl {
+    pub fn new<P: AsRef<Path>>(
+        dir: P,
+        index: usize,
+    ) -> std::result::Result<VolumeImpl, VolumeError> {
         let (read_sender, read_receiver) = tokio::sync::mpsc::channel(128);
         let (write_sender, write_receiver) = tokio::sync::mpsc::channel(128);
-        let volume = VolumeFiles::new(dir.as_ref(), index);
-        let (reader, writer) = volume.split();
+        let (reader, writer) = VolumeFiles::new(dir.as_ref(), index)?.split();
 
-        reader.start_read(read_receiver);
-        writer.start_write(write_receiver);
+        reader.start_read(read_receiver)?;
+        writer.start_write(write_receiver)?;
 
-        VolumeImpl {
+        Ok(VolumeImpl {
             read_sender,
             write_sender,
-        }
+        })
     }
 
-    pub async fn write(&mut self, key: u64, buf: Vec<u8>) -> std::result::Result<(), VolumeError> {
+    pub async fn write(&self, key: u64, buf: Vec<u8>) -> std::result::Result<(), VolumeError> {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        self.write_sender.send((key, buf, tx)).await.unwrap();
+        self.write_sender
+            .send((key, buf, tx))
+            .await
+            .map_err(|_| VolumeError::ChannelClosed)?;
         match rx.await {
             Err(e) => {
                 log::error!("recv write. key: {}, error: {}", key, e);
@@ -214,7 +236,7 @@ impl VolumeImpl {
         }
     }
 
-    pub async fn read(&mut self, key: u64) -> std::result::Result<Vec<u8>, VolumeError> {
+    pub async fn read(&self, key: u64) -> std::result::Result<Vec<u8>, VolumeError> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         if let Err(e) = self.read_sender.send((key, tx)).await {
             log::error!("send read. key: {}, error: {}", key, e);
@@ -223,7 +245,7 @@ impl VolumeImpl {
         match rx.await {
             Err(e) => {
                 log::error!("recv read. key: {}, error: {}", key, e);
-                Err(VolumeError::Channel)
+                Err(VolumeError::ChannelClosed)
             }
             Ok(Err(e)) => Err(e),
             Ok(Ok(buf)) => Ok(buf),
@@ -243,15 +265,15 @@ mod test {
             .filter_level(log::LevelFilter::Debug)
             .init();
 
-        test1().await;
-        test2().await;
+        test1().await.unwrap();
+        test2().await.unwrap();
     }
-    async fn test1() {
-        std::fs::remove_dir_all("./testdata").unwrap();
-        let mut volume = VolumeImpl::new("./testdata", 1);
-        let mut v = volume.clone();
+    async fn test1() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        std::fs::remove_dir_all("./testdata")?;
+        let volume = VolumeImpl::new("./testdata", 1)?;
+        let v = volume.clone();
         let task1 = tokio::spawn(async move { v.write(10, "hello world".bytes().collect()).await });
-        let mut v = volume.clone();
+        let v = volume.clone();
 
         if let Err(e) = task1.await {
             log::error!("{}", e);
@@ -266,15 +288,22 @@ mod test {
             volume.read(12).await
         );
         assert_eq!(
-            "hello world2".bytes().collect::<Vec<u8>>(),
-            volume.read(10).await.unwrap()
+            Err(VolumeError::NeedleNotFound(1, 12)),
+            volume.read(12).await
         );
-    }
-    async fn test2() {
-        let mut volume = VolumeImpl::new("./testdata", 1);
         assert_eq!(
             "hello world2".bytes().collect::<Vec<u8>>(),
             volume.read(10).await.unwrap()
         );
+        Ok(())
+    }
+
+    async fn test2() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let volume = VolumeImpl::new("./testdata", 1)?;
+        assert_eq!(
+            "hello world2".bytes().collect::<Vec<u8>>(),
+            volume.read(10).await.unwrap()
+        );
+        Ok(())
     }
 }
